@@ -19,7 +19,7 @@ def load_init_mu_var(f):
 data_list = glob.glob('converted/*.npz')
 datas = Parallel(n_jobs=48, verbose=1)(delayed(load_init_mu_var)(f) for f in data_list)
 
-temperature = 1.25
+temperature = 1.15
 
 
 

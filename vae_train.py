@@ -1,14 +1,20 @@
+import numpy as np
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import Dataset, ConcatDataset, DataLoader
-from joblib import Parallel, delayed
-import numpy as np
+
 import glob
 import cv2
-from model import VAE
 import pdb
 import time
+
+from joblib import Parallel, delayed
+
+from model import VAE
+from main import cfg
+from common import Logger
 
 class NumpyData(Dataset):
     def __init__(self, data):
@@ -21,20 +27,25 @@ class NumpyData(Dataset):
     def __getitem__(self, idx):
         return self.data[idx]
 
-data_list = glob.glob('record/*.npz')
-print("Loading Dataset")
-datas = Parallel(n_jobs=48, verbose=1)(delayed(lambda x: np.load(x)['sx'].transpose(0, 3, 1, 2))(f) for f in data_list[:])
-datasets = [NumpyData(x) for x in datas]
-total_data = ConcatDataset(datasets)
-dataloader = DataLoader(total_data, batch_size=1024, shuffle=True)
-kl_tolerance = 0.5
-z_size = 64
+def load_npz(f):
+    return np.load(f)['sx'].transpose(0, 3, 1, 2)
 
-model = torch.nn.DataParallel(VAE()).cuda()
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
+def get_vae_data_loader():
+    print("Loading Dataset")
+    data_list = glob.glob(cfg.seq_save_dir +'/*.npz')
+    datas = Parallel(n_jobs=cfg.num_cpus, verbose=1)(delayed(load_npz)(f) for f in data_list)
+    datasets = [NumpyData(x) for x in datas]
+    total_data = ConcatDataset(datasets)
+    dataloader = DataLoader(total_data, batch_size=cfg.vae_batch_size, shuffle=True)
 
-def train():
-    for epoch in range(12):
+
+def vae_train():
+    logger = Logger("{}/vae_train_{}.log".format(cfg.logger_save_dir, cfg.timestr))
+    dataloader = get_vae_data_loader()
+    model = torch.nn.DataParallel(VAE()).cuda()
+    optimizer = torch.optim.Adam(model.parameters(), lr=cfg.vae_lr)
+
+    for epoch in range(cfg.vae_num_epoch):
         for idx, imgs in enumerate(dataloader):
             now = time.time()
             imgs = imgs.float().cuda() / 255.0
@@ -55,11 +66,16 @@ def train():
             duration = time.time() - now
 
             if idx % 10 == 0:
-                info = "Epoch {:2d}\t Step [{:5d}/{:5d}]\t Loss {:6.3f}\t R_Loss {:6.3f}\t KL_Loss {:6.3f}\t Maxvar {:6.3f}\t Speed {:6.3f}".format(
-                        epoch, idx, len(dataloader), loss.item(), r_loss.item(), kl_loss.item(), logvar.max().item(), imgs.size(0) / duration)
-                print(info)
+                info = "Epoch {:2d}\t Step [{:5d}/{:5d}]\t Loss {:6.3f}\t R_Loss {:6.3f}\t  \
+                    KL_Loss {:6.3f}\t Maxvar {:6.3f}\t Speed {:6.3f}".format(
+                    epoch, idx, len(dataloader), loss.item(), r_loss.item(),
+                    kl_loss.item(), logvar.max().item(), imgs.size(0) / duration)
 
-        torch.save({'model': model.state_dict()}, 'save/vae_e%02d.pth' % epoch)
+                logger.log()
+
+        model_save_path = "{}/vae_{}_epoch_{:03d}.pth".format(
+                cfg.model_save_dir, cfg.timestr, epoch)
+        torch.save({'model': model.state_dict()}, model_save_path)
 
 def test():
     data = torch.load('out.pth')
@@ -71,19 +87,5 @@ def test():
         cv2.imwrite('imgx.png', imgx * 255.0)
         cv2.imwrite('imgy.png', imgy * 255.0)
         break
-
-
-def main():
-    train()
-    # test()
-
-main()
-
-
-
-
-
-
-
 
 
