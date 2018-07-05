@@ -127,6 +127,9 @@ if __name__ == '__main__':
     elif cfg.task == "es_train":
         es_train.es_train()
     elif cfg.task == "dream":
-        pass
+        dream_and_play.dream()
+        dream_and_play.real()
+    else:
+        print("No such task")
 
 
