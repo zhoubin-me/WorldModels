@@ -39,6 +39,8 @@ class Config:
     rnn_lr_decay = 0.9999
     rnn_r_loss_w = 9
 
+    rnn_sava_ckpt = ""
+
     # VAE Setting
     vae_batch_size = 1024
     vae_num_epoch = 12
@@ -48,6 +50,12 @@ class Config:
     vae_kl_tolerance = 0.5
 
     vae_extract_ckpt = ""
+
+    # Controller Setting
+    max_steps = 5000
+    ES_steps = 4000
+
+
 
 
 
@@ -97,6 +105,7 @@ cfg.info = info
 
 import collect_data
 import vae_train
+import es_train
 
 if __name__ == '__main__':
     os.environ['LD_LIBRARY_PATH'] += ":/opt/gcc-4.9.2/lib64"
@@ -113,4 +122,8 @@ if __name__ == '__main__':
         vae_train.extract()
     elif cfg.task == "rnn_train":
         rnn_train.rnn_train()
+    elif cfg.task == "es_train":
+        es_train.es_train()
+        pass
+
 
