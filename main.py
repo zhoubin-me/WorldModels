@@ -39,7 +39,7 @@ class Config:
     rnn_lr_decay = 0.9999
     rnn_r_loss_w = 9
 
-    rnn_sava_ckpt = ""
+    rnn_save_ckpt = ""
 
     # VAE Setting
     vae_batch_size = 1024
@@ -49,7 +49,7 @@ class Config:
     vae_z_size = 64
     vae_kl_tolerance = 0.5
 
-    vae_extract_ckpt = ""
+    vae_save_ckpt = ""
 
     # Controller Setting
     max_steps = 5000
@@ -75,6 +75,7 @@ class Config:
     seq_extract_dir = "../../data/doom_extracted"
     logger_save_dir = "../../logs/doom_model_exp"
     model_save_dir = "../../ckpt/doom_model_exp"
+    outs_save_dir = "../../outs/doom_model_exp"
     info = ""
 
 
@@ -106,6 +107,7 @@ cfg.info = info
 import collect_data
 import vae_train
 import es_train
+import dream_and_play
 
 if __name__ == '__main__':
     os.environ['LD_LIBRARY_PATH'] += ":/opt/gcc-4.9.2/lib64"
@@ -124,6 +126,7 @@ if __name__ == '__main__':
         rnn_train.rnn_train()
     elif cfg.task == "es_train":
         es_train.es_train()
+    elif cfg.task == "dream":
         pass
 
 

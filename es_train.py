@@ -116,15 +116,25 @@ class EvolutionModule:
         return self.weights
 
 
-def load_init_mu_var(f):
+def load_init(f):
     data = np.load(f)
     return data['mu'][0], data['logvar'][0]
+
+data_list = glob.glob(cfg.seq_extract_dir + '/*.npz')
+datas = Parallel(n_jobs=cfg.num_cpus, verbose=1)(delayed(load_init)(f) for f in data_list)
 
 def sample_init_z():
     idx = np.random.randint(0, len(datas))
     mu, logvar = datas[idx]
     z = mu + np.exp(logvar / 2.0) * np.random.randn(*mu.shape)
     return z
+
+model = RNNModel()
+rnn_stat_dict = torch.load(cfg.rnn_save_ckpt)['model']
+new_rnn_stat_dict = OrderedDict()
+for k, v in rnn_stat_dict.items():
+    new_rnn_stat_dict[k[7:]] = v
+model.load_state_dict(new_rnn_stat_dict)
 
 def get_reward(controller):
     model_x = copy.deepcopy(model)
@@ -160,16 +170,7 @@ def get_reward(controller):
     return step
 
 def es_train():
-    data_list = glob.glob(cfg.seq_extract_dir + '/*.npz')
-    datas = Parallel(n_jobs=cfg.num_cpus, verbose=1)(delayed(load_init_mu_var)(f) \
-            for f in data_list)
 
-    model = RNNModel()
-    rnn_stat_dict = torch.load(cfg.rnn_save_ckpt)
-    new_rnn_stat_dict = OrderedDict()
-    for k, v in rnn_stat_dict.items():
-        new_rnn_stat_dict[k[7:]] = v
-    model.load_state_dict(new_rnn_stat_dict)
 
     controller = Controller()
 
