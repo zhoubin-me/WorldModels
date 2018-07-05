@@ -13,20 +13,15 @@ import time
 from model import RNNModel
 from main import cfg
 
-batch_size = 100
-seq_length = 500
-z_size = 64
-rnn_size = 512
-
-
 class SeqData(Dataset):
     def __init__(self, mu, logvar, actions, rewards, dones):
+        seq_length = cfg.rnn_seq_len
         total_frames = mu.shape[0]
         num_batches = total_frames // seq_length
         N = num_batches * seq_length
 
-        self.mu = mu[:N].reshape(-1, seq_length, z_size)
-        self.logvar = logvar[:N].reshape(-1, seq_length, z_size)
+        self.mu = mu[:N].reshape(-1, seq_length, cfg.z_size)
+        self.logvar = logvar[:N].reshape(-1, seq_length, cfg.z_size)
         self.actions = actions[:N].reshape(-1, seq_length)
         self.rewards = rewards[:N].reshape(-1, seq_length)
         self.dones = dones[:N].reshape(-1, seq_length)
@@ -63,7 +58,7 @@ def rnn_train():
         np.random.shuffle(datas)
         data = map(np.concatenate, zip(*datas))
         dataset = SeqData(*data)
-        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
+        dataloader = DataLoader(dataset, batch_size=cfg.rnn_batch_size, shuffle=False)
 
         for idx, idata in enumerate(dataloader):
             # mu, logvar, actions, rewards, dones
@@ -87,7 +82,7 @@ def rnn_train():
             z_loss = -v.mean()
 
             r_loss = F.binary_cross_entropy_with_logits(done_p, target_d, reduce=False)
-            r_factor = torch.ones_like(r_loss) + target_d * 9
+            r_factor = torch.ones_like(r_loss) + target_d * cfg.rnn_r_loss_w
             r_loss = torch.mean(r_loss * r_factor)
 
             loss = z_loss + r_loss
@@ -105,7 +100,7 @@ def rnn_train():
                                 r_loss.item(), loss.item(), batch_size / duration)
                 logger.log(info)
 
-        if epoch % 10 == 0:
+        if (epoch + 1) % 10 == 0:
             model_save_path = "{}/rnn_{}_epoch_{:03d}.pth".format(
                     cfg.model_save_dir, cfg.timestr, epoch)
             torch.save({'model': model.state_dict()}, model_save_path)

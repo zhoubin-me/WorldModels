@@ -21,7 +21,7 @@ from common import Logger
 
 class Config:
     # Data Collection Setup
-    total_seq = 10000 # Total Number of Sequence to collect
+    total_seq = 12000 # Total Number of Sequence to collect
     max_seq_len = 2000 #
     min_seq_len = 100
 
@@ -37,6 +37,7 @@ class Config:
     rnn_lr_min = 0.00001
     rnn_lr_max = 0.001
     rnn_lr_decay = 0.9999
+    rnn_r_loss_w = 9
 
     # VAE Setting
     vae_batch_size = 1024
