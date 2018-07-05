@@ -13,6 +13,7 @@ import fire
 import os
 from datetime import datetime
 import numpy as np
+from common import Logger
 
 ####################################################################
 # Parameter Setup
@@ -23,16 +24,19 @@ class Config:
     total_seq = 10000 # Total Number of Sequence to collect
     max_seq_len = 2000 #
     min_seq_len = 100
-    seq_save_dir = "../../data/doom_frames"
-    logger_save_dir = "../../doom_model_exp"
-    model_save_dir = "../../doom_model_exp"
+
 
 
     # RNN Model Setting
     action_embed_size = 4
     rnn_size = 512
     rnn_batch_size = 1024
+    rnn_seq_len = 500
+    rnn_num_epoch = 600
     num_mixtures = 5
+    rnn_lr_min = 0.00001
+    rnn_lr_max = 0.001
+    rnn_lr_decay = 0.9999
 
     # VAE Setting
     vae_batch_size = 1024
@@ -41,6 +45,10 @@ class Config:
     vae_image_size = 64
     vae_z_size = 64
     vae_kl_tolerance = 0.5
+
+    vae_extract_ckpt = ""
+
+
 
     # Game Related Setting
     game_cfg_path = "./scenarios/take_cover.cfg"
@@ -54,6 +62,11 @@ class Config:
     num_cpus = 48
     timestr = ""
     task = ""
+    seq_save_dir = "../../data/doom_frames"
+    seq_extract_dir = "../../data/doom_extracted"
+    logger_save_dir = "../../logs/doom_model_exp"
+    model_save_dir = "../../ckpt/doom_model_exp"
+    info = ""
 
 
 cfg = Config
@@ -64,6 +77,7 @@ def parse(**kwargs):
             setattr(cfg, k, v)
         elif k != "help":
             raise ValueError('No such keyword: {}' % k)
+
     cfg.timestr = datetime.now().strftime('%Y%b%d_%H%M%S')
 
 fire.Fire(parse)
@@ -73,6 +87,8 @@ for k, v in cfg.__dict__.items():
     if not k.startswith("__"):
         info += "{}:\t {}\n".format(k, v)
 
+cfg.info = info
+
 
 ####################################################################
 # Here we go
@@ -80,14 +96,20 @@ for k, v in cfg.__dict__.items():
 
 import collect_data
 import vae_train
+
 if __name__ == '__main__':
-    print(info)
     os.environ['LD_LIBRARY_PATH'] += ":/opt/gcc-4.9.2/lib64"
     os.system('mkdir -p %s' % cfg.seq_save_dir)
+    os.system('mkdir -p %s' % cfg.seq_extract_dir)
+    os.system('mkdir -p %s' % cfg.model_save_dir)
     os.system('mkdir -p %s' % cfg.logger_save_dir)
 
     if cfg.task == "collect":
         collect_data.collect_all()
     elif cfg.task == "vae_train":
         vae_train.vae_train()
+    elif cfg.task == "vae_extract":
+        vae_train.extract()
+    elif cfg.task == "rnn_train":
+        rnn_train.rnn_train()
 

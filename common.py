@@ -13,7 +13,7 @@ class Logger:
 
     def log(self, info):
         print(info)
-        f.write(info + '\n')
-        f.flush()
+        self.f.write(info + '\n')
+        self.f.flush()
 
 

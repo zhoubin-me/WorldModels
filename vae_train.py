@@ -27,21 +27,22 @@ class NumpyData(Dataset):
     def __getitem__(self, idx):
         return self.data[idx]
 
-def load_npz(f):
-    return np.load(f)['sx'].transpose(0, 3, 1, 2)
 
-def get_vae_data_loader():
+def vae_train():
+    logger = Logger("{}/vae_train_{}.log".format(cfg.logger_save_dir, cfg.timestr))
+    logger.log(cfg.info)
+
     print("Loading Dataset")
+    def load_npz(f):
+        return np.load(f)['sx'].transpose(0, 3, 1, 2)
     data_list = glob.glob(cfg.seq_save_dir +'/*.npz')
+    data_list.sort()
     datas = Parallel(n_jobs=cfg.num_cpus, verbose=1)(delayed(load_npz)(f) for f in data_list)
+
     datasets = [NumpyData(x) for x in datas]
     total_data = ConcatDataset(datasets)
     dataloader = DataLoader(total_data, batch_size=cfg.vae_batch_size, shuffle=True)
 
-
-def vae_train():
-    logger = Logger("{}/vae_train_{}.log".format(cfg.logger_save_dir, cfg.timestr))
-    dataloader = get_vae_data_loader()
     model = torch.nn.DataParallel(VAE()).cuda()
     optimizer = torch.optim.Adam(model.parameters(), lr=cfg.vae_lr)
 
@@ -54,7 +55,7 @@ def vae_train():
             r_loss = (imgs_rc - imgs).pow(2).view(imgs.size(0), -1).sum(dim=1).mean()
 
             kl_loss = - 0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp(), dim=1)
-            min_kl = torch.zeros_like(kl_loss) + kl_tolerance * z_size
+            min_kl = torch.zeros_like(kl_loss) + cfg.vae_kl_tolerance * cfg.vae_z_size
             kl_loss = torch.max(kl_loss, min_kl).mean()
 
             loss = r_loss + kl_loss
@@ -66,26 +67,64 @@ def vae_train():
             duration = time.time() - now
 
             if idx % 10 == 0:
-                info = "Epoch {:2d}\t Step [{:5d}/{:5d}]\t Loss {:6.3f}\t R_Loss {:6.3f}\t  \
-                    KL_Loss {:6.3f}\t Maxvar {:6.3f}\t Speed {:6.3f}".format(
+                info = "Epoch {:2d}\t Step [{:5d}/{:5d}]\t Loss {:6.3f}\t R_Loss {:6.3f}\t \
+                        KL_Loss {:6.3f}\t Maxvar {:6.3f}\t Speed {:6.3f}".format(
                     epoch, idx, len(dataloader), loss.item(), r_loss.item(),
                     kl_loss.item(), logvar.max().item(), imgs.size(0) / duration)
 
-                logger.log()
+                logger.log(info)
 
         model_save_path = "{}/vae_{}_epoch_{:03d}.pth".format(
                 cfg.model_save_dir, cfg.timestr, epoch)
         torch.save({'model': model.state_dict()}, model_save_path)
 
-def test():
-    data = torch.load('out.pth')
-    for idx, imgs in enumerate(dataloader):
-        imgs = imgs.cuda() / 255.0
-        mu, logvar, imgs_rc, z = model(imgs)
-        imgy = imgs_rc.detach().cpu().numpy()[0].transpose(1, 2, 0)
-        imgx = imgs.detach().cpu().numpy()[0].transpose(1, 2, 0)
-        cv2.imwrite('imgx.png', imgx * 255.0)
-        cv2.imwrite('imgy.png', imgy * 255.0)
-        break
+def convert(fs, idx):
+
+    model = VAE().cuda(idx)
+    old_stat_dict = torch.load(cfg.vae_extract_ckpt)['model']
+    stat_dict = OrderedDict()
+    for k, v in old_stat_dict.items():
+        stat_dict[k[7:]] = v
+    model.load_state_dict(stat_dict)
+
+
+    for n, f in enumerate(fs):
+        data = np.load(f)
+        imgs = data['sx'].transpose(0, 3, 1, 2)
+        actions = data['ax']
+        rewards = data['rx']
+        dones = data['dx']
+        x = torch.from_numpy(imgs).float().cuda(idx) / 255.0
+        mu, logvar, _, _ = model(x)
+        save_path = "{}/{}".format(cfg.seq_extract_dir, f.split('/')[-1])
+
+        np.savez_compressed(save_path,
+                mu=mu.detach().cpu().numpy(),
+                logvar=logvar.detach().cpu().numpy(),
+                dones=dones,
+                rewards=rewards,
+                actions=actions)
+
+        if n % 10 == 0:
+            print('Process %d: %5d / %5d' % (idx, n, N))
+
+def vae_extract():
+    logger = Logger("{}/vae_extract_{}.log".format(cfg.logger_save_dir, cfg.timestr))
+    logger.log(cfg.info)
+
+    print("Loading Dataset")
+    data_list = glob.glob(cfg.seq_save_dir +'/*.npz')
+    data_list.sort()
+    N = len(data_list) // 4
+
+    procs = []
+    for idx in range(4):
+        p = Process(target=convert, args=(data_list[idx*N:(idx+1)*N], idx))
+        procs.append(p)
+        p.start()
+        time.sleep(1)
+
+    for p in procs:
+        p.join()
 
 

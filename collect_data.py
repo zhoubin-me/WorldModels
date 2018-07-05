@@ -7,6 +7,7 @@ import os
 import cv2
 
 from main import cfg
+from common import Logger
 
 def preprocess(img):
     img = img[:, 80:-80, :]
@@ -57,6 +58,8 @@ def collect_once(index):
         print("Worker {}: {}/{}".format(index, epi, nepi))
 
 def collect_all():
+    logger = Logger("{}/data_collection_{}.log".format(cfg.logger_save_dir, cfg.timestr))
+    logger.log(cfg.info)
     with TPE(max_workers=cfg.num_cpus) as e:
         e.map(collect_once, [i for i in range(cfg.num_cpus)])
 
