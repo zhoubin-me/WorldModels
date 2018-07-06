@@ -11,10 +11,14 @@ import pdb
 import time
 
 from joblib import Parallel, delayed
+from multiprocessing import Process
+from collections import OrderedDict
 
-from model import VAE
+import model
 from main import cfg
 from common import Logger
+
+VAE = model.VAE
 
 class NumpyData(Dataset):
     def __init__(self, data):
@@ -78,10 +82,11 @@ def vae_train():
                 cfg.model_save_dir, cfg.timestr, epoch)
         torch.save({'model': model.state_dict()}, model_save_path)
 
-def convert(fs, idx):
+
+def convert(fs, idx, N):
 
     model = VAE().cuda(idx)
-    old_stat_dict = torch.load(cfg.vae_extract_ckpt)['model']
+    old_stat_dict = torch.load(cfg.vae_save_ckpt)['model']
     stat_dict = OrderedDict()
     for k, v in old_stat_dict.items():
         stat_dict[k[7:]] = v
@@ -119,7 +124,7 @@ def vae_extract():
 
     procs = []
     for idx in range(4):
-        p = Process(target=convert, args=(data_list[idx*N:(idx+1)*N], idx))
+        p = Process(target=convert, args=(data_list[idx*N:(idx+1)*N], idx, N))
         procs.append(p)
         p.start()
         time.sleep(1)

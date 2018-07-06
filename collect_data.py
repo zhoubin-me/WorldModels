@@ -52,7 +52,8 @@ def collect_once(index):
 
         if step > cfg.min_seq_len:
             sx, ax, rx, dx = [np.array(x, dtype=np.uint8) for x in zip(*traj)]
-            save_path = "{}/{:04d}_{:05d}.npz".format(cfg.seq_save_dir, index, epi)
+            rind = np.random.randint(0, 99999)
+            save_path = "{}/{:04d}_{:05d}_{:05d}.npz".format(cfg.seq_save_dir, index, epi, rind)
             np.savez_compressed(save_path, sx=sx, ax=ax, rx=rx, dx=dx)
 
         print("Worker {}: {}/{}".format(index, epi, nepi))

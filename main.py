@@ -30,7 +30,7 @@ class Config:
     # RNN Model Setting
     action_embed_size = 4
     rnn_size = 512
-    rnn_batch_size = 1024
+    rnn_batch_size = 512
     rnn_seq_len = 500
     rnn_num_epoch = 600
     num_mixtures = 5
@@ -56,9 +56,6 @@ class Config:
     ES_steps = 4000
 
 
-
-
-
     # Game Related Setting
     game_cfg_path = "./scenarios/take_cover.cfg"
     game_actions = [[True, False], [False, True]]
@@ -75,7 +72,6 @@ class Config:
     seq_extract_dir = "../../data/doom_extracted"
     logger_save_dir = "../../logs/doom_model_exp"
     model_save_dir = "../../ckpt/doom_model_exp"
-    outs_save_dir = "../../outs/doom_model_exp"
     info = ""
 
 
@@ -92,7 +88,7 @@ def parse(**kwargs):
 
 fire.Fire(parse)
 
-info = ""
+info = "\n"
 for k, v in cfg.__dict__.items():
     if not k.startswith("__"):
         info += "{}:\t {}\n".format(k, v)
@@ -106,8 +102,9 @@ cfg.info = info
 
 import collect_data
 import vae_train
-import es_train
-import dream_and_play
+import rnn_train
+#import es_train
+#import dream_and_play
 
 if __name__ == '__main__':
     os.environ['LD_LIBRARY_PATH'] += ":/opt/gcc-4.9.2/lib64"
@@ -121,15 +118,17 @@ if __name__ == '__main__':
     elif cfg.task == "vae_train":
         vae_train.vae_train()
     elif cfg.task == "vae_extract":
-        vae_train.extract()
+        vae_train.vae_extract()
     elif cfg.task == "rnn_train":
         rnn_train.rnn_train()
+    else:
+        print("No such task")
+    '''
     elif cfg.task == "es_train":
         es_train.es_train()
     elif cfg.task == "dream":
         dream_and_play.dream()
         dream_and_play.real()
-    else:
-        print("No such task")
+    '''
 
 

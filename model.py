@@ -2,7 +2,10 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from main import cfg
+import main
+
+cfg = main.cfg
+
 
 
 class VAE(nn.Module):

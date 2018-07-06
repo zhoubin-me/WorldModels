@@ -10,8 +10,14 @@ import glob
 import pdb
 import time
 
-from model import RNNModel
-from main import cfg
+from common import Logger
+
+import main
+import model
+
+RNNModel = model.RNNModel
+cfg = main.cfg
+
 
 class SeqData(Dataset):
     def __init__(self, mu, logvar, actions, rewards, dones):
@@ -20,8 +26,8 @@ class SeqData(Dataset):
         num_batches = total_frames // seq_length
         N = num_batches * seq_length
 
-        self.mu = mu[:N].reshape(-1, seq_length, cfg.z_size)
-        self.logvar = logvar[:N].reshape(-1, seq_length, cfg.z_size)
+        self.mu = mu[:N].reshape(-1, seq_length, cfg.vae_z_size)
+        self.logvar = logvar[:N].reshape(-1, seq_length, cfg.vae_z_size)
         self.actions = actions[:N].reshape(-1, seq_length)
         self.rewards = rewards[:N].reshape(-1, seq_length)
         self.dones = dones[:N].reshape(-1, seq_length)
@@ -52,7 +58,7 @@ def rnn_train():
     datas = Parallel(n_jobs=cfg.num_cpus, verbose=1)(delayed(load_npz)(f) for f in data_list)
 
     model = torch.nn.DataParallel(RNNModel()).cuda()
-    optimizer = torch.optim.Adam(model.parameters())
+    optimizer = torch.optim.Adam(model.parameters(), eps=1e-3)
 
     for epoch in range(cfg.rnn_num_epoch):
         np.random.shuffle(datas)
@@ -64,12 +70,14 @@ def rnn_train():
             # mu, logvar, actions, rewards, dones
             now = time.time()
             adjust_learning_rate(optimizer, idx)
-            idata = list(x.cuda() for x in idata)
-            z = idata[0] + torch.exp(idata[1] / 2.0) * torch.randn_like(idata[1])
-            target_z = z[:, 1:, :].contiguous().view(-1, 1)
-            target_d = idata[-1][:, 1:].float()
 
-            if z.size(0) != batch_size:
+            with torch.no_grad():
+                idata = list(x.cuda() for x in idata)
+                z = idata[0] + torch.exp(idata[1] / 2.0) * torch.randn_like(idata[1])
+                target_z = z[:, 1:, :].contiguous().view(-1, 1)
+                target_d = idata[-1][:, 1:].float()
+
+            if z.size(0) != cfg.rnn_batch_size:
                 continue
 
             logmix, mu, logstd, done_p = model(z, idata[2], idata[4])
@@ -97,7 +105,7 @@ def rnn_train():
                 info = "Epoch {:2d}\t Step [{:5d}/{:5d}]\t Z_Loss {:5.3f}\t \
                         R_Loss {:5.3f}\t Loss {:5.3f}\t Speed {:5.2f}".format(
                                 epoch, idx, len(dataloader), z_loss.item(),
-                                r_loss.item(), loss.item(), batch_size / duration)
+                                r_loss.item(), loss.item(), cfg.rnn_batch_size / duration)
                 logger.log(info)
 
         if (epoch + 1) % 10 == 0:
