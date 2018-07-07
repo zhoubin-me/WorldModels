@@ -14,11 +14,10 @@ from joblib import Parallel, delayed
 from multiprocessing import Process
 from collections import OrderedDict
 
-import model
 from main import cfg
 from common import Logger
+from model import VAE
 
-VAE = model.VAE
 
 class NumpyData(Dataset):
     def __init__(self, data):

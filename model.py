@@ -114,15 +114,11 @@ class Controller(nn.Module):
         super(Controller, self).__init__()
         self.fc = nn.Sequential(
                 # hx_size + cx_size + z_size
-                nn.Linear(cfg.rnn_size + cfg.rnn_size + cfg.vae_z_size, 128),
-                nn.ReLU(True),
-                nn.Linear(128, len(cfg.game_actions)),)
+                nn.Linear(cfg.rnn_size + cfg.rnn_size + cfg.vae_z_size, len(cfg.game_actions)),
+                )
 
     def forward(self, x):
         return self.fc(x)
 
-    def init_weight(self, params):
-        for param1, param2 in zip(self.parameters(), params):
-            param1.data.copy_(param2.data)
 
 

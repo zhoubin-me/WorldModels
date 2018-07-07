@@ -12,11 +12,8 @@ import time
 
 from common import Logger
 
-import main
-import model
-
-RNNModel = model.RNNModel
-cfg = main.cfg
+from main import cfg
+from model import RNNModel
 
 
 class SeqData(Dataset):
