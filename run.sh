@@ -16,8 +16,8 @@
 # python main.py --task vae_extract --vae_save_ckpt ../../ckpt/doom_model_exp/vae_2018Jul06_102503_epoch_011.pth
 
 # 4. Train RNN
-# python main.py --task rnn_train
+python main.py --task rnn_train
 
 # 5. Train Controller
-python main.py --task es_train --rnn_save_ckpt ../../ckpt/doom_model_exp/rnn_2018-Jul-07@03:17:51_epoch_499.pth
+# python main.py --task es_train --rnn_save_ckpt ../../ckpt/doom_model_exp/rnn_2018-Jul-07@03:17:51_epoch_499.pth
 
