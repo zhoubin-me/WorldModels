@@ -53,7 +53,11 @@ class Config:
 
     # Controller Setting
     max_steps = 5000
-    ES_steps = 4000
+    es_steps = 4000
+    es_lr = 0.001
+    es_sigma = 0.1
+    es_lr_decay = 0.999
+    population_size = 500
 
 
     # Game Related Setting
@@ -84,7 +88,7 @@ def parse(**kwargs):
         elif k != "help":
             raise ValueError('No such keyword: {}' % k)
 
-    cfg.timestr = datetime.now().strftime('%Y%b%d_%H%M%S')
+    cfg.timestr = time.strftime('%Y-%b-%d@%H:%M:%S')
 
 fire.Fire(parse)
 
@@ -100,13 +104,14 @@ cfg.info = info
 # Here we go
 ####################################################################
 
-import collect_data
-import vae_train
-import rnn_train
-#import es_train
 #import dream_and_play
 
 if __name__ == '__main__':
+    import collect_data
+    import vae_train
+    import rnn_train
+    import es_train
+
     os.environ['LD_LIBRARY_PATH'] += ":/opt/gcc-4.9.2/lib64"
     os.system('mkdir -p %s' % cfg.seq_save_dir)
     os.system('mkdir -p %s' % cfg.seq_extract_dir)
