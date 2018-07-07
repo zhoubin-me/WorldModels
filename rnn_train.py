@@ -42,6 +42,7 @@ def adjust_learning_rate(optimizer, step):
     lr = (cfg.rnn_lr_max - cfg.rnn_lr_min) * cfg.rnn_lr_decay ** step + cfg.rnn_lr_min
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
+    return lr
 
 def load_npz(f):
     data = np.load(f)
@@ -55,7 +56,8 @@ def rnn_train():
     datas = Parallel(n_jobs=cfg.num_cpus, verbose=1)(delayed(load_npz)(f) for f in data_list)
 
     model = torch.nn.DataParallel(RNNModel()).cuda()
-    optimizer = torch.optim.Adam(model.parameters(), eps=1e-3)
+    optimizer = torch.optim.Adam(model.parameters())
+    global_step = 0
 
     for epoch in range(cfg.rnn_num_epoch):
         np.random.shuffle(datas)
@@ -66,7 +68,7 @@ def rnn_train():
         for idx, idata in enumerate(dataloader):
             # mu, logvar, actions, rewards, dones
             now = time.time()
-            adjust_learning_rate(optimizer, idx)
+            lr = adjust_learning_rate(optimizer, global_step)
 
             with torch.no_grad():
                 idata = list(x.cuda() for x in idata)
@@ -78,8 +80,6 @@ def rnn_train():
                 continue
 
             logmix, mu, logstd, done_p = model(z, idata[2], idata[4])
-            logmix -= logmix.exp().sum(dim=1, keepdim=True).log()
-
 
             v = logmix - 0.5 * ((target_z - mu) / torch.exp(logstd)) ** 2
             v = v - logstd - cfg.logsqrt2pi
@@ -95,14 +95,15 @@ def rnn_train():
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+            global_step += 1
 
             duration = time.time() - now
 
             if idx % 10 == 0:
                 info = "Epoch {:2d}\t Step [{:5d}/{:5d}]\t Z_Loss {:5.3f}\t \
-                        R_Loss {:5.3f}\t Loss {:5.3f}\t Speed {:5.2f}".format(
+                        R_Loss {:5.3f}\t Loss {:5.3f}\t LR {:.5f}\t Speed {:5.2f}".format(
                                 epoch, idx, len(dataloader), z_loss.item(),
-                                r_loss.item(), loss.item(), cfg.rnn_batch_size / duration)
+                                r_loss.item(), loss.item(), lr, cfg.rnn_batch_size / duration)
                 logger.log(info)
 
         if (epoch + 1) % 10 == 0:

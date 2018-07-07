@@ -11,6 +11,7 @@ import copy
 import pickle
 import time
 import glob
+import pdb
 
 from joblib import Parallel, delayed
 from collections import OrderedDict
@@ -35,7 +36,7 @@ def sample_init_z(datas):
 def sample_new_controller(old_controller):
     new_weights = OrderedDict()
     for k, v in old_controller.state_dict().items():
-        noise = torch.randn_like(param.data) * cfg.es_sigma
+        noise = torch.randn_like(v) * cfg.es_sigma
         new_weights[k] = v + noise
     new_controller = Controller()
     new_controller.load_state_dict(new_weights)
@@ -44,33 +45,39 @@ def sample_new_controller(old_controller):
 def dream(model_x, controller, z):
 
     model = copy.deepcopy(model_x)
-    done = 0
+    rewards = []
 
-    model.reset()
+    for epi in range(cfg.trials_per_pop):
+        done = 0
+        model.reset()
 
-    for step in range(cfg.max_steps):
-        z = torch.from_numpy(z).float().unsqueeze(0)
-        x = torch.cat((model_x.hx.detach(), model_x.cx.detach(), z), dim=1)
-        y = controller(x)
-        m = Categorical(F.softmax(y, dim=1))
-        action = m.sample()
+        for step in range(cfg.max_steps):
+            z = torch.from_numpy(z).float().unsqueeze(0)
+            x = torch.cat((model.hx.detach(), model.cx.detach(), z), dim=1)
+            y = controller(x)
+            m = Categorical(F.softmax(y, dim=1))
+            action = m.sample()
 
-        logmix, mu, logstd, done_p = model_x.step(z.unsqueeze(0), action.unsqueeze(0))
+            logmix, mu, logstd, done_p = model.step(z.unsqueeze(0), action.unsqueeze(0))
 
-        logmix = logmix / cfg.temperature
-        logmix -= logmix.max()
-        logmix = torch.exp(logmix)
+            logmix = logmix / cfg.temperature
+            logmix -= logmix.max()
+            logmix = torch.exp(logmix)
 
-        m = Categorical(logmix)
-        idx = m.sample()
+            m = Categorical(logmix)
+            idx = m.sample()
 
-        new_mu = torch.FloatTensor([mu[i, j] for i, j in enumerate(idx)])
-        new_logstd = torch.FloatTensor([logstd[i, j] for i, j in enumerate(idx)])
-        z_next = new_mu + new_logstd.exp() * torch.randn_like(new_mu) * np.sqrt(cfg.temperature)
+            new_mu = torch.FloatTensor([mu[i, j] for i, j in enumerate(idx)])
+            new_logstd = torch.FloatTensor([logstd[i, j] for i, j in enumerate(idx)])
+            z_next = new_mu + new_logstd.exp() * torch.randn_like(new_mu) * np.sqrt(cfg.temperature)
 
-        z = z_next.detach().numpy()
-        if done_p.squeeze().item() > 0:
-            return step
+            z = z_next.detach().numpy()
+            if done_p.squeeze().item() > 0:
+                rewards.append(step)
+                break
+
+    return np.mean(rewards)
+
 
 
 
@@ -93,23 +100,25 @@ def es_train():
 
     for step in range(cfg.es_steps):
         new_controllers = [sample_new_controller(controller) for _ in range(cfg.population_size)]
-        init_z = [sample_init_z(datas) for _ in range(cfg.population_size)]
+        init_zs = [sample_init_z(datas) for _ in range(cfg.population_size)]
 
-        rewards = Parallel(n_jobs=48, verbose=1)(delayed(dream)(model, c, z) for c, z in zip(new_controller, init_z))
+        rewards = Parallel(n_jobs=48, verbose=1)(delayed(dream)(model, c, z) for c, z in zip(new_controllers, init_zs))
 
         if np.std(rewards) != 0:
             rewards_x = torch.tensor((rewards - np.mean(rewards)) / np.std(rewards)).float()
 
             for k, v in controller.state_dict().items():
-                A = [c.stat_dict()[k] for x in new_controllers]
-                A = torch.cat(A, dim=2)
+                A = [c.state_dict()[k].unsqueeze(-1) for c in new_controllers]
+                A = torch.cat(A, dim=-1)
                 B = torch.matmul(A, rewards_x)
 
-                v += lr / (cfg.population_size * cfg.es_sigma) * rewards_x
+                v += lr / (cfg.population_size * cfg.es_sigma) * B
                 lr *= cfg.es_lr_decay
 
         info = "Step {:d}\t Max_R {:4f}\t Mean_R {:4f}\t Min_R {:4f}".format(step, max(rewards), np.mean(rewards), min(rewards))
         logger.log(info)
-        save_path = "{}/controller_{}_step_{:05d}.pth".format(cfg.model_save_dir, cfg.timestr, step)
-        torch.save({'model': controller.state_dict()}, save_path)
+
+        if step % 10 == 0:
+            save_path = "{}/controller_{}_step_{:05d}.pth".format(cfg.model_save_dir, cfg.timestr, step)
+            torch.save({'model': controller.state_dict()}, save_path)
 

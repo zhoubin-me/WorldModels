@@ -11,9 +11,8 @@
 """
 import fire
 import os
-from datetime import datetime
 import numpy as np
-from common import Logger
+import time
 
 ####################################################################
 # Parameter Setup
@@ -30,13 +29,13 @@ class Config:
     # RNN Model Setting
     action_embed_size = 4
     rnn_size = 512
-    rnn_batch_size = 512
+    rnn_batch_size = 128
     rnn_seq_len = 500
     rnn_num_epoch = 600
     num_mixtures = 5
     rnn_lr_min = 0.00001
     rnn_lr_max = 0.001
-    rnn_lr_decay = 0.9999
+    rnn_lr_decay = 0.99999
     rnn_r_loss_w = 9
 
     rnn_save_ckpt = ""
@@ -51,13 +50,15 @@ class Config:
 
     vae_save_ckpt = ""
 
-    # Controller Setting
+    # Controller ES Setting
     max_steps = 5000
     es_steps = 4000
     es_lr = 0.001
     es_sigma = 0.1
     es_lr_decay = 0.999
     population_size = 500
+    temperature = 1.15
+    trials_per_pop = 10
 
 
     # Game Related Setting
@@ -126,14 +127,10 @@ if __name__ == '__main__':
         vae_train.vae_extract()
     elif cfg.task == "rnn_train":
         rnn_train.rnn_train()
-    else:
-        print("No such task")
-    '''
     elif cfg.task == "es_train":
         es_train.es_train()
     elif cfg.task == "dream":
         dream_and_play.dream()
         dream_and_play.real()
-    '''
 
 
