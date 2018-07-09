@@ -12,12 +12,23 @@ from random import shuffle, choice
 import cv2
 import os
 from model import VAE, RNNModel
-from es_train import sample_init_z
+from es_train import sample_init_z, load_init
+from main import cfg
+
 
 def transform(x):
     return torch.from_numpy(np.array(x)).unsqueeze(0).unsqueeze(0)
 
+def write_video(frames, fname):
+    fourcc = cv2.VideoWriter_fourcc(*'DIVX')
+    video = cv2.VideoWriter(fname, fourcc, 10, (64, 64))
+    for frame in frames:
+        video.write(frame.astype(np.uint8))
+
 def dream():
+    data_list = glob.glob(cfg.seq_extract_dir + '/*.npz')
+    datas = Parallel(n_jobs=cfg.num_cpus, verbose=1)(delayed(load_init)(f) for f in data_list)
+
     vae = VAE()
     vae_stat_dict = torch.load(cfg.vae_save_ckpt)['model']
     new_vae_stat_dict = OrderedDict()
@@ -33,14 +44,14 @@ def dream():
     model.load_state_dict(new_rnn_stat_dict)
 
     frames = []
-    z = sample_init_z()
+    z = sample_init_z(datas)
     done = 0
     model.reset()
     for step in range(1000):
         action = np.random.randint(0, 2)
         z, action = [transform(x) for x in [z, action]]
         z = z.float()
-        frames += [vae.decode(z).detach().numpy()]
+        frames += [vae.decode(z).detach().numpy().transpose(2, 3, 1, 0)[:, :, :, 0] * 255.0]
         logmix, mu, logstd, done_p = model.step(z, action)
 
         logmix = logmix / cfg.temperature
@@ -58,27 +69,38 @@ def dream():
 
         if done_p.squeeze().item() > 0:
             break
+
+    write_video(frames, 'dream.avi')
+    os.system('scp dream.avi bzhou@10.80.43.125:/home/bzhou/Dropbox')
+
+    '''
     os.system('rm frames/*.png')
     for idx, frame in enumerate(frames):
         img = frame.transpose(2, 3, 1, 0) * 255.0
         cv2.imwrite('frames/frame_{:04d}.png'.format(idx), img[:, :, :, 0])
     print('Making GIF')
-    os.system('convert -delay 10 -loop 0 frames/*.png dream_{}.gif'.format(cfg.timestr))
-    os.system('scp dream_{}.gif bzhou@10.80.43.125:/home/bzhou/Dropbox'.format(cfg.timestr))
+    os.system('convert -delay 10 -loop 0 frames/*.png dream_{}.gif'.format(0))
+    os.system('scp dream_{}.gif bzhou@10.80.43.125:/home/bzhou/Dropbox'.format(0))
+    '''
 
 def real():
-
     data = glob.glob(cfg.seq_save_dir + '/*.npz')
     data = choice(data)
     frames = np.load(data)['sx']
 
+    write_video(frames, 'real.avi')
+    os.system('scp real.avi bzhou@10.80.43.125:/home/bzhou/Dropbox')
+
+
+    '''
     os.system('rm frames/*.png')
     for idx, frame in enumerate(frames):
         cv2.imwrite('frames/frame_{:03d}.png'.format(idx), frame)
 
     print('Making GIF')
-    os.system('convert -delay 10 -loop 0 frames/*.png real_{}.gif'.format(cfg.timestr))
-    os.system('scp real_{}.gif bzhou@10.80.43.125:/home/bzhou/Dropbox'.format(cfg.timestr))
+    os.system('convert -delay 10 -loop 0 frames/*.png real_{}.gif'.format(0))
+    os.system('scp real_{}.gif bzhou@10.80.43.125:/home/bzhou/Dropbox'.format(0))
+    '''
 
 
 

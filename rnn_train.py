@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader, ConcatDataset
+from torch.nn.utils.clip_grad import clip_grad_value_
 
 from joblib import Parallel, delayed
 import glob
@@ -70,20 +71,20 @@ def rnn_train():
             now = time.time()
             lr = adjust_learning_rate(optimizer, global_step)
 
-            with torch.no_grad():
-                idata = list(x.cuda() for x in idata)
-                z = idata[0] + torch.exp(idata[1] / 2.0) * torch.randn_like(idata[1])
-                target_z = z[:, 1:, :].contiguous().view(-1, 1)
-                target_d = idata[-1][:, 1:].float()
+            idata = list(x.cuda() for x in idata)
+            z = idata[0] + torch.exp(idata[1] / 2.0) * torch.randn_like(idata[1])
+            target_z = z[:, 1:, :].contiguous().view(-1, 1)
+            target_d = idata[-1][:, 1:].float()
 
             if z.size(0) != cfg.rnn_batch_size:
                 continue
 
             logmix, mu, logstd, done_p = model(z, idata[2], idata[4])
+            logmix = F.log_softmax(logmix, dim=1)
 
-            v = logmix - 0.5 * ((target_z - mu) / torch.exp(logstd)) ** 2
-            v = v - logstd - cfg.logsqrt2pi
-            v = v.exp().sum(dim=1, keepdim=True).log()
+            v = logmix - 0.5 * ((target_z - mu) / torch.exp(logstd)) ** 2 - logstd - cfg.logsqrt2pi
+            v_max = v.max(dim=1, keepdim=True)[0]
+            v = (v - v_max).exp().sum(dim=1).log() + v_max.squeeze()
             z_loss = -v.mean()
 
             r_loss = F.binary_cross_entropy_with_logits(done_p, target_d, reduce=False)

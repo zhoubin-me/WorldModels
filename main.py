@@ -29,13 +29,13 @@ class Config:
     # RNN Model Setting
     action_embed_size = 4
     rnn_size = 512
-    rnn_batch_size = 128
+    rnn_batch_size = 256
     rnn_seq_len = 500
     rnn_num_epoch = 600
     num_mixtures = 5
     rnn_lr_min = 0.00001
     rnn_lr_max = 0.001
-    rnn_lr_decay = 0.99999
+    rnn_lr_decay = 0.99995
     rnn_r_loss_w = 9
 
     rnn_save_ckpt = ""
@@ -56,7 +56,7 @@ class Config:
     es_lr = 0.001
     es_sigma = 0.1
     es_lr_decay = 0.999
-    population_size = 500
+    population_size = 50
     temperature = 1.15
     trials_per_pop = 10
 
@@ -112,6 +112,7 @@ if __name__ == '__main__':
     import vae_train
     import rnn_train
     import es_train
+    import dream_and_play
 
     os.environ['LD_LIBRARY_PATH'] += ":/opt/gcc-4.9.2/lib64"
     os.system('mkdir -p %s' % cfg.seq_save_dir)

@@ -81,7 +81,6 @@ def dream(model_x, controller, z):
 
 
 
-
 def es_train():
     data_list = glob.glob(cfg.seq_extract_dir + '/*.npz')
     datas = Parallel(n_jobs=cfg.num_cpus, verbose=1)(delayed(load_init)(f) for f in data_list)

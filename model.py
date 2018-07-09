@@ -68,6 +68,9 @@ class RNNModel(nn.Module):
         self.hx, self.cx = torch.zeros(1, cfg.rnn_size), torch.zeros(1, cfg.rnn_size)
 
     def forward(self, z, actions, dones):
+        # z: (batch, seq, feat)
+        # actions: (batch, seq, 1) -> (batch, seq, embed_n)
+        # dones: (batch, seq) <- {0, 1}
         actions = self.action_embed(actions.long())
         dones = dones.float()
         inp = torch.cat((z, actions), dim=2)
@@ -90,7 +93,6 @@ class RNNModel(nn.Module):
         logmix = logmix.contiguous().view(-1, cfg.num_mixtures)
         mu = mu.contiguous().view(-1, cfg.num_mixtures)
         logstd = logstd.contiguous().view(-1, cfg.num_mixtures)
-        logmix = logmix - logmix.exp().sum(dim=1, keepdim=True).log()
 
         return logmix, mu, logstd, done_p.squeeze()
 
