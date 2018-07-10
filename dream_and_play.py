@@ -73,15 +73,6 @@ def dream():
     write_video(frames, 'dream.avi')
     os.system('scp dream.avi bzhou@10.80.43.125:/home/bzhou/Dropbox')
 
-    '''
-    os.system('rm frames/*.png')
-    for idx, frame in enumerate(frames):
-        img = frame.transpose(2, 3, 1, 0) * 255.0
-        cv2.imwrite('frames/frame_{:04d}.png'.format(idx), img[:, :, :, 0])
-    print('Making GIF')
-    os.system('convert -delay 10 -loop 0 frames/*.png dream_{}.gif'.format(0))
-    os.system('scp dream_{}.gif bzhou@10.80.43.125:/home/bzhou/Dropbox'.format(0))
-    '''
 
 def real():
     data = glob.glob(cfg.seq_save_dir + '/*.npz')
@@ -92,15 +83,6 @@ def real():
     os.system('scp real.avi bzhou@10.80.43.125:/home/bzhou/Dropbox')
 
 
-    '''
-    os.system('rm frames/*.png')
-    for idx, frame in enumerate(frames):
-        cv2.imwrite('frames/frame_{:03d}.png'.format(idx), frame)
-
-    print('Making GIF')
-    os.system('convert -delay 10 -loop 0 frames/*.png real_{}.gif'.format(0))
-    os.system('scp real_{}.gif bzhou@10.80.43.125:/home/bzhou/Dropbox'.format(0))
-    '''
 
 
 

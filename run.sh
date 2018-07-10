@@ -16,10 +16,10 @@
 # python main.py --task vae_extract --vae_save_ckpt ../../ckpt/doom_model_exp/vae_2018Jul06_102503_epoch_011.pth
 
 # 4. Train RNN
-python main.py --task rnn_train
+# python main.py --task rnn_train
 
 # 5. Train Controller
-# python main.py --task es_train --rnn_save_ckpt ../../ckpt/doom_model_exp/rnn_2018-Jul-08@10:15:51_epoch_599.pth
+python main.py --task es_train --rnn_save_ckpt ../../ckpt/doom_model_exp/rnn_2018-Jul-09@01:49:42_epoch_599.pth
 
 # 6. Play with the model
-# python main.py --task dream --rnn_save_ckpt ../../ckpt/doom_model_exp/rnn_2018-Jul-08@10:15:51_epoch_349.pth --vae_save_ckpt ../../ckpt/doom_model_exp/vae_2018Jul06_102503_epoch_011.pth
+# python main.py --task dream --rnn_save_ckpt ../../ckpt/doom_model_exp/rnn_2018-Jul-09@01:49:42_epoch_599.pth --vae_save_ckpt ../../ckpt/doom_model_exp/vae_2018Jul06_102503_epoch_011.pth

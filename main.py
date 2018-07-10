@@ -54,9 +54,11 @@ class Config:
     max_steps = 5000
     es_steps = 4000
     es_lr = 0.001
-    es_sigma = 0.1
     es_lr_decay = 0.999
-    population_size = 50
+    es_sigma = 0.1
+    es_sigma_decay = 0.999
+
+    population_size = 100
     temperature = 1.15
     trials_per_pop = 10
 
