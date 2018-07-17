@@ -51,16 +51,17 @@ class Config:
     vae_save_ckpt = ""
 
     # Controller ES Setting
-    max_steps = 5000
-    es_steps = 4000
-    es_lr = 0.001
-    es_lr_decay = 0.999
+    max_steps = 2100
+    es_steps = 2000
     es_sigma = 0.1
-    es_sigma_decay = 0.999
 
-    population_size = 100
+
+    num_workers = 64
+    population_size = 128
     temperature = 1.15
-    trials_per_pop = 10
+    trials_per_pop = 5
+
+    ctrl_save_ckpt = None
 
 
     # Game Related Setting
@@ -114,7 +115,7 @@ if __name__ == '__main__':
     import vae_train
     import rnn_train
     import es_train
-    import dream_and_play
+    import play
 
     os.environ['LD_LIBRARY_PATH'] += ":/opt/gcc-4.9.2/lib64"
     os.system('mkdir -p %s' % cfg.seq_save_dir)
@@ -132,8 +133,8 @@ if __name__ == '__main__':
         rnn_train.rnn_train()
     elif cfg.task == "es_train":
         es_train.es_train()
-    elif cfg.task == "dream":
-        dream_and_play.dream()
-        dream_and_play.real()
+    elif cfg.task == "play":
+        play.play_in_dream()
+        play.play_in_real()
 
 

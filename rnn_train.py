@@ -80,7 +80,11 @@ def rnn_train():
                 continue
 
             logmix, mu, logstd, done_p = model(z, idata[2], idata[4])
-            logmix = F.log_softmax(logmix, dim=1)
+
+            # logmix = logmix - torch.reduce_logsumexp(logmix)
+            logmix_max = logmix.max(dim=1, keepdim=True)[0]
+            logmix_reduce_logsumexp = (logmix - logmix_max).exp().sum(dim=1, keepdim=True).log() + logmix_max
+            logmix = logmix - logmix_reduce_logsumexp
 
             v = logmix - 0.5 * ((target_z - mu) / torch.exp(logstd)) ** 2 - logstd - cfg.logsqrt2pi
             v_max = v.max(dim=1, keepdim=True)[0]

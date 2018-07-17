@@ -106,21 +106,35 @@ class RNNModel(nn.Module):
         logmix = logmix.contiguous().view(-1, cfg.num_mixtures)
         mu = mu.contiguous().view(-1, cfg.num_mixtures)
         logstd = logstd.contiguous().view(-1, cfg.num_mixtures)
-        logmix = logmix - logmix.exp().sum(dim=1, keepdim=True).log()
 
         return logmix, mu, logstd, done_p.squeeze()
+
+
+'''
+class Controller(nn.Module):
+    def __init__(self):
+        super(Controller, self).__init__()
+        self.fc = nn.Sequential(
+                # hx_size + cx_size + z_size
+                nn.Linear(cfg.rnn_size + cfg.rnn_size + cfg.vae_z_size, 64),
+                nn.ReLU(True),
+                nn.Linear(64, len(cfg.game_actions)),
+                )
+
+    def forward(self, x):
+        return self.fc(x)
+
+'''
 
 
 class Controller(nn.Module):
     def __init__(self):
         super(Controller, self).__init__()
         self.fc = nn.Sequential(
-                # hx_size + cx_size + z_size
-                nn.Linear(cfg.rnn_size + cfg.rnn_size + cfg.vae_z_size, len(cfg.game_actions)),
-                )
+                nn.Linear(cfg.rnn_size + cfg.rnn_size + cfg.vae_z_size, 1),
+            )
+
 
     def forward(self, x):
         return self.fc(x)
-
-
 

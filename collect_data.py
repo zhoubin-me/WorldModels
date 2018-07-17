@@ -30,9 +30,8 @@ def initialize_vizdoom():
 def collect_once(index):
     actions = cfg.game_actions
     nepi = cfg.total_seq // cfg.num_cpus + 1
-
+    game = initialize_vizdoom()
     for epi in range(nepi):
-        game = initialize_vizdoom()
         game.new_episode()
         repeat = np.random.randint(1, 11)
         traj = []
