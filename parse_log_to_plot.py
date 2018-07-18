@@ -15,7 +15,7 @@ from bokeh.layouts import column
 from bokeh.palettes import *
 import os
 
-output_file('worldmodel.html')
+output_file('temp/worldmodel.html')
 
 def parse_and_plot(vae=None, rnn=None, es=None):
     figs = []
@@ -29,7 +29,7 @@ def parse_and_plot(vae=None, rnn=None, es=None):
         figs += [parse_es(es)]
 
     save(column(*figs))
-    os.system('scp worldmodel.html bzhou@10.80.43.125:/home/bzhou/Dropbox/share')
+    os.system('scp temp/worldmodel.html bzhou@10.80.43.125:/home/bzhou/Dropbox/share')
 
 def parse_es(log_file):
 
