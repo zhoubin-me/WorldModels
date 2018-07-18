@@ -131,9 +131,8 @@ class Controller(nn.Module):
     def __init__(self):
         super(Controller, self).__init__()
         self.fc = nn.Sequential(
-                nn.Linear(cfg.rnn_size + cfg.rnn_size + cfg.vae_z_size, 1),
+                nn.Linear(cfg.rnn_size + cfg.rnn_size + cfg.vae_z_size, 2),
             )
-
 
     def forward(self, x):
         return self.fc(x)

@@ -81,14 +81,17 @@ def rnn_train():
 
             logmix, mu, logstd, done_p = model(z, idata[2], idata[4])
 
-            # logmix = logmix - torch.reduce_logsumexp(logmix)
+            # logmix = F.log_softmax(logmix)
             logmix_max = logmix.max(dim=1, keepdim=True)[0]
             logmix_reduce_logsumexp = (logmix - logmix_max).exp().sum(dim=1, keepdim=True).log() + logmix_max
             logmix = logmix - logmix_reduce_logsumexp
 
+            # v = F.log_softmax(v)
             v = logmix - 0.5 * ((target_z - mu) / torch.exp(logstd)) ** 2 - logstd - cfg.logsqrt2pi
             v_max = v.max(dim=1, keepdim=True)[0]
             v = (v - v_max).exp().sum(dim=1).log() + v_max.squeeze()
+
+            # maximize the prob, minimize the negative log likelihood
             z_loss = -v.mean()
 
             r_loss = F.binary_cross_entropy_with_logits(done_p, target_d, reduce=False)

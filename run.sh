@@ -19,7 +19,7 @@
 # python main.py --task rnn_train
 
 # 5. Train Controller
-python main.py --task es_train --rnn_save_ckpt ../../ckpt/doom_model_exp/rnn_2018-Jul-09@01:49:42_epoch_599.pth \
+python main.py --task es_train --rnn_save_ckpt ../../ckpt/doom_model_exp/rnn_2018-Jul-17@05:17:16_epoch_509.pth \
     --vae_save_ckpt ../../ckpt/doom_model_exp/vae_2018Jul06_102503_epoch_011.pth
 
 # 6. Play with the model

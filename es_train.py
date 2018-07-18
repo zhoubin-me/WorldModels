@@ -86,6 +86,7 @@ def rollout(model_x, cs, zs):
                 logmix_reduce_logsumexp = (logmix - logmix_max).exp().sum(dim=1, keepdim=True).log() + logmix_max
                 logmix = logmix - logmix_reduce_logsumexp
 
+                # Adjust temperature
                 logmix = logmix / cfg.temperature
                 logmix -= logmix.max(dim=1, keepdim=True)[0]
                 logmix = F.softmax(logmix, dim=1)
@@ -99,14 +100,15 @@ def rollout(model_x, cs, zs):
 
                 z = z_next.detach().numpy()
                 if done_p.squeeze().item() > 0:
-                    rewards.append(step)
                     break
+            rewards.append(step)
         out.append(np.mean(rewards))
     return out
 
 
-def evaluate(model_x, vae, controller):
+def evaluate(model_x, vae_x, controller):
     model = copy.deepcopy(model_x)
+    vae = copy.deepcopy(vae_x)
     game = initialize_vizdoom()
     rewards = []
 
@@ -130,9 +132,8 @@ def evaluate(model_x, vae, controller):
             done = game.is_episode_finished()
 
             if done:
-                rewards.append(step)
                 break
-
+        rewards.append(step)
     return rewards
 
 def es_train():
@@ -173,6 +174,7 @@ def es_train():
         inp = [(new_controllers[idx*N:(idx+1)*N], init_zs[idx*N:(idx+1)*N]) for idx in range(cfg.num_workers)]
         rewards = Parallel(n_jobs=cfg.num_workers, verbose=0)(delayed(rollout)(model, cs, zs) for cs, zs in inp)
         rewards = sum(rewards, [])
+        # rewards = Parallel(n_jobs=cfg.num_workers, verbose=0)(delayed(evaluate)(model, vae, c) for c in new_controllers)
         info = "Step {:d}\t Max_R {:4f}\t Mean_R {:4f}\t Min_R {:4f}".format(step, max(rewards), np.mean(rewards), min(rewards))
         logger.log(info)
         cost = [-x for x in rewards]
