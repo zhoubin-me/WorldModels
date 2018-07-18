@@ -12,20 +12,20 @@ import os
 
 from model import VAE, RNNModel, Controller
 from collect_data import initialize_vizdoom, preprocess
-from es_train import sample_init_z, load_init
+from es_train import sample_init_z, load_or_save_init_z
 from main import cfg
 
 
 
 def write_video(frames, fname, reward=None):
     fourcc = cv2.VideoWriter_fourcc(*'DIVX')
+    # video = cv2.VideoWriter(fname, fourcc, 10, (64, 148))
     video = cv2.VideoWriter(fname, fourcc, 10, (64, 64))
     for frame in frames:
         video.write(frame.astype(np.uint8))
 
 def play_in_dream():
-    data_list = glob.glob(cfg.seq_extract_dir + '/*.npz')
-    datas = Parallel(n_jobs=cfg.num_cpus, verbose=1)(delayed(load_init)(f) for f in data_list)
+    mus, logvars = load_or_save_init_z()
 
     vae = VAE()
     vae_stat_dict = torch.load(cfg.vae_save_ckpt)['model']
@@ -56,7 +56,7 @@ def play_in_dream():
         done = 0
         model.reset()
         frames_ = []
-        z = sample_init_z(datas)
+        z = sample_init_z(mus, logvars)
 
         for step in range(cfg.max_steps):
 
@@ -94,7 +94,7 @@ def play_in_dream():
     idx = rewards.index(max(rewards))
     frames = frames[idx]
 
-    print(rewards)
+    print(rewards, rewards[idx], np.mean(rewards))
     print(len(frames))
 
     write_video(frames, 'temp/dream.avi')
@@ -161,15 +161,47 @@ def play_in_real():
     idx = rewards.index(max(rewards))
     frames = frames[idx]
 
-    print(rewards)
+    print(rewards, rewards[idx], np.mean(rewards))
     print(len(frames))
 
 
     write_video(frames, 'temp/play.avi')
     os.system('scp temp/play.avi bzhou@10.80.43.125:/home/bzhou/Dropbox/share')
 
+def play_data():
+    import glob
+    data = glob.glob('../../data/doom_frames/*.npz')
+    data = np.random.choice(data)
+    frames = np.load(data)['sx']
+
+    features = '{}/{}'.format(cfg.seq_extract_dir, data.split('/')[-1])
+    features = np.load(features)
+    mus = features['mu']
+    logvars = features['logvar']
+    z = mus + np.exp(logvars / 2.0) * np.random.randn(*mus.shape)
+    z = torch.from_numpy(z).float()
 
 
+    vae = VAE()
+    vae_stat_dict = torch.load('../../ckpt/doom_model_exp/vae_2018-Jul-18@02:51:16_epoch_011.pth')['model']
+    new_vae_stat_dict = OrderedDict()
+    for k, v in vae_stat_dict.items():
+        new_vae_stat_dict[k[7:]] = v
+    vae.load_state_dict(new_vae_stat_dict)
+
+    x = vae.decode(z).detach().numpy().transpose(0, 2, 3, 1) * 255.0
+    new_frames = np.zeros((x.shape[0], x.shape[1]*2 + 20, x.shape[2], x.shape[3]))
+    new_frames[:, :x.shape[1], :, :] = x
+    new_frames[:, -x.shape[1]:, :, :] = frames.astype(np.float)
+
+    # new_frames = np.concatenate((x.astype(np.uint8), frames), axis=1)
+    print(new_frames, new_frames.dtype)
+
+    write_video(new_frames, 'temp/data.avi')
+    os.system('scp temp/data.avi bzhou@10.80.43.125:/home/bzhou/Dropbox/share')
+
+
+# play_data()
 
 
 

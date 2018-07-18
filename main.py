@@ -29,13 +29,13 @@ class Config:
     # RNN Model Setting
     action_embed_size = 4
     rnn_size = 512
-    rnn_batch_size = 256
+    rnn_batch_size = 128
     rnn_seq_len = 500
     rnn_num_epoch = 600
     num_mixtures = 5
     rnn_lr_min = 0.00001
     rnn_lr_max = 0.001
-    rnn_lr_decay = 0.99995
+    rnn_lr_decay = 0.99999
     rnn_r_loss_w = 9
 
     rnn_save_ckpt = ""
@@ -57,16 +57,16 @@ class Config:
 
 
     num_workers = 64
-    population_size = 128
+    population_size = 64
     temperature = 1.15
-    trials_per_pop = 5
+    trials_per_pop = 16
 
     ctrl_save_ckpt = None
 
 
     # Game Related Setting
     game_cfg_path = "./scenarios/take_cover.cfg"
-    game_actions = [[True, False], [False, True]]
+    game_actions = [[True, False], [False, True], [False, False]]
 
     action_repeat = 12          # maximum action repeat
     resolution = (64, 64)       # frame resolution to resize to

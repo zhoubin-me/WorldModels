@@ -99,7 +99,7 @@ def convert(fs, idx, N):
         rewards = data['rx']
         dones = data['dx']
         x = torch.from_numpy(imgs).float().cuda(idx) / 255.0
-        mu, logvar, _, _ = model(x)
+        mu, logvar, _, z = model(x)
         save_path = "{}/{}".format(cfg.seq_extract_dir, f.split('/')[-1])
 
         np.savez_compressed(save_path,

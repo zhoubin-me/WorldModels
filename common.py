@@ -18,3 +18,4 @@ class Logger:
         self.f.write(info + '\n')
         self.f.flush()
 
+

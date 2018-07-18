@@ -10,7 +10,6 @@ from main import cfg
 from common import Logger
 
 def preprocess(img):
-    img = img[:, 80:-80, :]
     img = cv2.resize(img, cfg.resolution)
     return img
 

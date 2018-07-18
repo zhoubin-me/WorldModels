@@ -110,7 +110,6 @@ class RNNModel(nn.Module):
         return logmix, mu, logstd, done_p.squeeze()
 
 
-'''
 class Controller(nn.Module):
     def __init__(self):
         super(Controller, self).__init__()
@@ -137,3 +136,4 @@ class Controller(nn.Module):
     def forward(self, x):
         return self.fc(x)
 
+'''

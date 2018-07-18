@@ -13,19 +13,21 @@
 # python main.py --task vae_train
 
 # 3. Extract Frames with VAE
-# python main.py --task vae_extract --vae_save_ckpt ../../ckpt/doom_model_exp/vae_2018Jul06_102503_epoch_011.pth
+# python main.py --task vae_extract --vae_save_ckpt ../../ckpt/doom_model_exp/vae_2018-Jul-18@02:51:16_epoch_011.pth
 
 # 4. Train RNN
 # python main.py --task rnn_train
 
 # 5. Train Controller
-python main.py --task es_train --rnn_save_ckpt ../../ckpt/doom_model_exp/rnn_2018-Jul-17@05:17:16_epoch_509.pth \
-    --vae_save_ckpt ../../ckpt/doom_model_exp/vae_2018Jul06_102503_epoch_011.pth
+
+#python main.py --task es_train \
+#    --vae_save_ckpt ../../ckpt/doom_model_exp/vae_2018-Jul-18@02:51:16_epoch_011.pth \
+#    --rnn_save_ckpt ../../ckpt/doom_model_exp/rnn_2018-Jul-18@05:14:33_epoch_299.pth
 
 # 6. Play with the model
-# python main.py --task play \
-#     --rnn_save_ckpt ../../ckpt/doom_model_exp/rnn_2018-Jul-09@01:49:42_epoch_599.pth \
-#     --vae_save_ckpt ../../ckpt/doom_model_exp/vae_2018Jul06_102503_epoch_011.pth \
-#     --ctrl_save_ckpt ../../ckpt/doom_model_exp/controller_2018-Jul-09@08:27:32_step_03980.pth
+python main.py --task play \
+    --vae_save_ckpt ../../ckpt/doom_model_exp/vae_2018-Jul-18@02:51:16_epoch_011.pth \
+    --rnn_save_ckpt ../../ckpt/doom_model_exp/rnn_2018-Jul-18@05:14:33_epoch_299.pth \
+    --ctrl_save_ckpt ../../ckpt/doom_model_exp/controller_2018-Jul-18@08:55:39_step_00015.pth
 
 # 7. Plot

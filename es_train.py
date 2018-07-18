@@ -31,12 +31,17 @@ def load_init(f):
     data = np.load(f)
     return data['mu'][0], data['logvar'][0]
 
-def save_init_z():
-    data_list = glob.glob(cfg.seq_extract_dir + '/*.npz')
-    datas = Parallel(n_jobs=cfg.num_cpus, verbose=1)(delayed(load_init)(f) for f in data_list)
-    mus = np.array([data[0] for data in datas])
-    logvars = np.array([data[1] for data in datas])
-    np.savez_compressed('init_z.npz', mus=mus, logvars=logvars)
+def load_or_save_init_z():
+    if os.path.exists('init_z.npz'):
+        data = np.load('init_z.npz')
+        mus = data['mus']
+        logvars = data['logvars']
+    else:
+        data_list = glob.glob(cfg.seq_extract_dir + '/*.npz')
+        datas = Parallel(n_jobs=cfg.num_cpus, verbose=1)(delayed(load_init)(f) for f in data_list)
+        mus = np.array([data[0] for data in datas])
+        logvars = np.array([data[1] for data in datas])
+        np.savez_compressed('init_z.npz', mus=mus, logvars=logvars)
     return mus, logvars
 
 def sample_init_z(mus, logvars):
@@ -140,12 +145,7 @@ def es_train():
     logger = Logger("{}/es_train_{}.log".format(cfg.logger_save_dir, cfg.timestr))
     logger.log(cfg.info)
 
-    if os.path.exists('init_z.npz'):
-        data = np.load('init_z.npz')
-        mus = data['mus']
-        logvars = data['logvars']
-    else:
-        mus, logvars = save_init_z()
+    mus, logvars = load_or_save_init_z()
 
     vae = VAE()
     vae_stat_dict = torch.load(cfg.vae_save_ckpt)['model']
