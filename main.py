@@ -24,6 +24,15 @@ class Config:
     max_seq_len = 2000 #
     min_seq_len = 100
 
+    # VAE Setting
+    vae_batch_size = 256
+    vae_num_epoch = 50
+    vae_lr = 1e-4
+    vae_image_size = 64
+    vae_z_size = 64
+    vae_kl_tolerance = 0.5
+
+    vae_save_ckpt = ""
 
 
     # RNN Model Setting
@@ -40,26 +49,17 @@ class Config:
 
     rnn_save_ckpt = ""
 
-    # VAE Setting
-    vae_batch_size = 1024
-    vae_num_epoch = 12
-    vae_lr = 1e-4
-    vae_image_size = 64
-    vae_z_size = 64
-    vae_kl_tolerance = 0.5
-
-    vae_save_ckpt = ""
 
     # Controller ES Setting
     max_steps = 2100
     es_steps = 2000
     es_sigma = 0.1
 
-
     num_workers = 64
     population_size = 64
     temperature = 1.15
     trials_per_pop = 16
+    best_pop_rollouts = 1024
 
     ctrl_save_ckpt = None
 

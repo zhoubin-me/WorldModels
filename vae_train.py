@@ -15,7 +15,7 @@ from multiprocessing import Process
 from collections import OrderedDict
 
 from main import cfg
-from common import Logger
+from common import Logger, EarlyStopping, ReduceLROnPlateau
 from model import VAE
 
 
@@ -35,22 +35,29 @@ def vae_train():
     logger = Logger("{}/vae_train_{}.log".format(cfg.logger_save_dir, cfg.timestr))
     logger.log(cfg.info)
 
-    print("Loading Dataset")
+    logger.log("Loading Dataset")
+
     def load_npz(f):
         return np.load(f)['sx'].transpose(0, 3, 1, 2)
+
     data_list = glob.glob(cfg.seq_save_dir +'/*.npz')
     data_list.sort()
     datas = Parallel(n_jobs=cfg.num_cpus, verbose=1)(delayed(load_npz)(f) for f in data_list)
 
     datasets = [NumpyData(x) for x in datas]
     total_data = ConcatDataset(datasets)
-    dataloader = DataLoader(total_data, batch_size=cfg.vae_batch_size, shuffle=True)
+    train_data_loader = DataLoader(total_data, batch_size=cfg.vae_batch_size, shuffle=True)
 
     model = torch.nn.DataParallel(VAE()).cuda()
     optimizer = torch.optim.Adam(model.parameters(), lr=cfg.vae_lr)
+    scheduler = ReduceLROnPlateau(optimizer, 'min', factor=0.5, patience=5)
+    earlystopping = EarlyStopping('min', patience=30)
 
+
+    best_loss = None
     for epoch in range(cfg.vae_num_epoch):
-        for idx, imgs in enumerate(dataloader):
+        current_loss = 0
+        for idx, imgs in enumerate(train_data_loader):
             now = time.time()
             imgs = imgs.float().cuda() / 255.0
             mu, logvar, imgs_rc, z = model(imgs)
@@ -66,21 +73,52 @@ def vae_train():
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+            current_loss += loss.item() * imgs.size(0)
 
             duration = time.time() - now
 
             if idx % 10 == 0:
                 info = "Epoch {:2d}\t Step [{:5d}/{:5d}]\t Loss {:6.3f}\t R_Loss {:6.3f}\t \
                         KL_Loss {:6.3f}\t Maxvar {:6.3f}\t Speed {:6.3f}".format(
-                    epoch, idx, len(dataloader), loss.item(), r_loss.item(),
+                    epoch, idx, len(train_data_loader), loss.item(), r_loss.item(),
                     kl_loss.item(), logvar.max().item(), imgs.size(0) / duration)
-
                 logger.log(info)
 
-        model_save_path = "{}/vae_{}_epoch_{:03d}.pth".format(
-                cfg.model_save_dir, cfg.timestr, epoch)
-        torch.save({'model': model.state_dict()}, model_save_path)
+        current_loss /= len(total_data)
+        if best_loss is None:
+            best_loss = current_loss
 
+            to_save_data = {
+                    'model': model.state_dict(),
+                    'loss': best_loss,
+                    'epoch': epoch}
+            to_save_path = '{}/vae_{}_best.pth'.format(cfg.model_save_dir, cfg.timestr)
+
+        elif current_loss > best_loss:
+            to_save_data = {
+                    'model': model.state_dict(),
+                    'loss': current_loss,
+                    'epoch': epoch}
+            to_save_path = '{}/vae_{}_latest.pth'.format(cfg.model_save_dir, cfg.timestr)
+
+        else:
+            best_loss = current_loss
+
+            to_save_data = {
+                    'model': model.state_dict(),
+                    'loss': best_loss,
+                    'epoch': epoch}
+            to_save_path = '{}/vae_{}_best.pth'.format(cfg.model_save_dir, cfg.timestr)
+
+        torch.save(to_save_data, to_save_path)
+        scheduler.step(current_loss)
+        earlystopping.step(current_loss)
+
+        logger.log('At Epoch {}, Current Loss {:6.3f}, Best Loss {:6.3f}'.format(
+            epoch, current_loss, best_loss))
+
+        if earlystopping.stop:
+            break
 
 def convert(fs, idx, N):
 

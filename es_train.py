@@ -187,4 +187,3 @@ def es_train():
         logger.log(info)
         save_path = "{}/controller_{}_step_{:05d}.pth".format(cfg.model_save_dir, cfg.timestr, step)
         torch.save({'model': best_controller.state_dict()}, save_path)
-

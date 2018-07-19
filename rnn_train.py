@@ -4,14 +4,13 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader, ConcatDataset
-# from torch.nn.utils.clip_grad import clip_grad_value_
 
 from joblib import Parallel, delayed
 import glob
 import pdb
 import time
 
-from common import Logger
+from common import Logger, EarlyStopping, ReduceLROnPlateau
 
 from main import cfg
 from model import RNNModel
@@ -39,7 +38,6 @@ class SeqData(Dataset):
 
 
 def adjust_learning_rate(optimizer, step):
-    """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
     lr = (cfg.rnn_lr_max - cfg.rnn_lr_min) * cfg.rnn_lr_decay ** step + cfg.rnn_lr_min
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
@@ -59,18 +57,19 @@ def rnn_train():
     model = torch.nn.DataParallel(RNNModel()).cuda()
     optimizer = torch.optim.Adam(model.parameters())
     global_step = 0
-
+    lr = cfg.rnn_lr_max
+    best_loss = None
     for epoch in range(cfg.rnn_num_epoch):
         np.random.shuffle(datas)
         data = map(np.concatenate, zip(*datas))
         dataset = SeqData(*data)
         dataloader = DataLoader(dataset, batch_size=cfg.rnn_batch_size, shuffle=False)
+        current_loss = 0
 
         for idx, idata in enumerate(dataloader):
             # mu, logvar, actions, rewards, dones
             now = time.time()
             lr = adjust_learning_rate(optimizer, global_step)
-
             idata = list(x.cuda() for x in idata)
             z = idata[0] + torch.exp(idata[1] / 2.0) * torch.randn_like(idata[1])
             target_z = z[:, 1:, :].contiguous().view(-1, 1)
@@ -99,6 +98,7 @@ def rnn_train():
             r_loss = torch.mean(r_loss * r_factor)
 
             loss = z_loss + r_loss
+            current_loss += loss.item()
 
             optimizer.zero_grad()
             loss.backward()
@@ -114,8 +114,33 @@ def rnn_train():
                                 r_loss.item(), loss.item(), lr, cfg.rnn_batch_size / duration)
                 logger.log(info)
 
-        if (epoch + 1) % 10 == 0:
-            model_save_path = "{}/rnn_{}_epoch_{:03d}.pth".format(
-                    cfg.model_save_dir, cfg.timestr, epoch)
-            torch.save({'model': model.state_dict()}, model_save_path)
+        if best_loss is None:
+            best_loss = current_loss
+
+            to_save_data = {
+                    'model': model.state_dict(),
+                    'loss': best_loss,
+                    'epoch': epoch}
+            to_save_path = '{}/rnn_{}_best.pth'.format(cfg.model_save_dir, cfg.timestr)
+
+        elif current_loss > best_loss:
+            to_save_data = {
+                    'model': model.state_dict(),
+                    'loss': current_loss,
+                    'epoch': epoch}
+            to_save_path = '{}/rnn_{}_latest.pth'.format(cfg.model_save_dir, cfg.timestr)
+
+        else:
+            best_loss = current_loss
+            to_save_data = {
+                    'model': model.state_dict(),
+                    'loss': best_loss,
+                    'epoch': epoch}
+            to_save_path = '{}/rnn_{}_best.pth'.format(cfg.model_save_dir, cfg.timestr)
+
+        torch.save(to_save_data, to_save_path)
+
+        logger.log('At Epoch {}, Current Loss {:6.3f}, Best Loss {:6.3f}'.format(
+            epoch, current_loss, best_loss))
+
 
