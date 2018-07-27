@@ -132,7 +132,8 @@ def evaluate(model_x, vae_x, controller):
             m = Categorical(F.softmax(y, dim=1))
             action = m.sample().item()
             action = cfg.game_actions[action]
-
+            
+            model.step(z.unsqueeze(0), action.unsqueeze(0))
             reward = game.make_action(action)
             done = game.is_episode_finished()
 
