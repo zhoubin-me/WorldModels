@@ -1,3 +1,4 @@
+
 import torch
 import torch.nn.functional as F
 from torch.distributions import Categorical
@@ -7,6 +8,7 @@ import cv2
 import numpy as np
 import os
 
+from collect_data import DoomTakeOver
 from model import VAE, RNNModel, Controller
 from es_train import load_init_z, sample_init_z
 from config import cfg
@@ -17,6 +19,45 @@ def write_video(frames, fname, size=(64, 64)):
     video = cv2.VideoWriter(fname, fourcc, 20, size)
     for frame in frames:
         video.write(frame.astype(np.uint8))
+
+def test_controller():
+
+    vae = VAE()
+    vae.load_state_dict(torch.load(cfg.vae_save_ckpt)['model'])
+    model = RNNModel()
+    model.load_state_dict(torch.load(cfg.rnn_save_ckpt)['model'])
+    controller = Controller()
+    controller.load_state_dict(torch.load(cfg.ctrl_save_ckpt)['model'])
+
+    env = DoomTakeOver()
+    rewards = []
+    for epi in range(cfg.trials_per_pop):
+        obs = env.reset()
+        print(obs.shape)
+        model.reset()
+        for step in range(cfg.max_steps):
+            obs = torch.from_numpy(obs.transpose(2, 0, 1)).unsqueeze(0).float() / 255.0
+            mu, logvar, x, z = vae(obs)
+
+            inp = torch.cat((model.hx.detach(), model.cx.detach(), z), dim=1)
+            y = controller(inp)
+
+            y = y.item()
+            if y > 1 / 3.0:
+                action = torch.LongTensor([1])
+            elif y < -1 / 3.0:
+                action = torch.LongTensor([2])
+            else:
+                action = torch.LongTensor([0])
+
+            model.step(z.unsqueeze(0), action.unsqueeze(0))
+            obs_next, reward, done, _ = evn.step(action.item())
+            obs = obs_next
+            if done:
+                break
+        rewards.append(step)
+    rewards = np.array(rewards)
+    print(rewards.mean(), rewards.max(), rewards.min(), rewards.std())
 
 def test_rnn():
     mus, logvars = load_init_z()
@@ -64,12 +105,6 @@ def test_rnn():
     write_video(frames, 'rnn.avi')
     os.system('mv rnn.avi /home/bzhou/Dropbox/share')
 
-
-
-
-
-
-
 def test_vae():
     data = glob.glob('../../data/doom_frames/*.npz')
     data = np.random.choice(data)
@@ -107,9 +142,8 @@ def test_frames():
 
 # test_frames()
 # test_vae()
-test_rnn()
-
-# play_data()
+# test_rnn()
+test_controller()
 
 
 

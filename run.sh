@@ -41,7 +41,8 @@ elif [ $1 -eq 6 ]
 then
     # 5. Play Model
     export CUDA_VISIBLE_DEVICES=0,1
-    python play.py \
-        --vae-save-ckpt ./ckpt/ \
-        --rnn-save-ckpt ./ckpt/
+    python test.py \
+        --vae-save-ckpt ./ckpt/vae_2018-Jul-29@18:08:14_e012.pth \
+        --rnn-save-ckpt ./ckpt/rnn_2018-Jul-29@20:37:43_e390.pth \
+        --ctrl-save-ckpt ./ckpt/controller_2018-Jul-30@15:08:02_step_00000.pth
 fi

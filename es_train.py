@@ -110,30 +110,6 @@ def rollout(model, controller, zs):
     return np.array(rewards)
 
 
-def evaluate(model, vae, controller):
-    from collect_data import DoomTakeOver
-    env = DoomTakeOver()
-    rewards = []
-    for epi in range(cfg.trials_per_pop):
-        obs = env.reset()
-        model.reset()
-        for step in range(cfg.max_steps):
-
-            obs = torch.from_numpy(obs.transpose(2, 0, 1)).unsqueeze(0).float() / 255.0
-            mu, logvar, x, z = vae(obs)
-
-            inp = torch.cat((model.hx.detach(), model.cx.detach(), z), dim=1)
-            y = controller(inp)
-            m = Categorical(F.softmax(y, dim=1))
-            action = m.sample()
-            model.step(z.unsqueeze(0), action.unsqueeze(0))
-            obs_next, reward, done, _ = evn.step(action.item())
-            obs = obs_next
-            if done:
-                break
-        rewards.append(step)
-    return np.array(rewards)
-
 def l2_reg(x):
     x = np.array(x)
     return cfg.es_w_reg * np.mean(x * x, axis=1)
@@ -211,30 +187,6 @@ def master(comm):
             current_controller = deflatten_controller(current_param)
             save_path = "{}/controller_{}_step_{:05d}.pth".format(cfg.model_save_dir, cfg.timestr, step)
             torch.save({'model': current_controller.state_dict()}, save_path)
-
-        if (step + 1) % 9999 == 0:
-            best_param = es.result[0]
-            current_param = es.result[5]
-            best_reward = - es.result[1]
-            sigma = es.result[6]
-            rms_stdv = np.mean(np.sqrt(sigma * sigma))
-
-            for idx in range(cfg.num_workers):
-                comm.send(current_param, dest=idx+1, tag=3)
-
-            check = np.ones(cfg.num_workers)
-            rewards = []
-            for idx in range(cfg.num_workers):
-                reward = comm.recv(source=idx+1, tag=2)
-                rewards.append(reward)
-                check[idx] = 0
-
-            assert check.sum() == 0
-            assert len(rewards) == cfg.num_workers
-            rewards = np.array(rewards)
-
-            info = "EVAL--Step {:d}\t Max_R {:4f}\t Mean_R {:4f}\t Min_R {:4f}".format(step, rewards.max(), rewards.mean(), rewards.min())
-            logger.log(info)
 
 def es_train():
     comm = MPI.COMM_WORLD
