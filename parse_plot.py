@@ -38,15 +38,27 @@ def parse_es(log_file):
         data = re.findall(regex, f.read())
         data = [[float(x) for x in row] for row in data]
         data = np.array(data)
+        x = data[:, 0]
+        print('ES', data.shape)
 
-    print('ES', data.shape)
-    x = data[:, 0]
+    with open('result.txt', 'r') as f:
+        regex = r'Mean ([\d\.]+)\s*Max (\d+)\s*Min (\d+)\s*Std ([\d\.]+)'
+        best = re.findall(regex, f.read())
+        best = [[float(x) for x in row] for row in best]
+        best = np.array(best)
+        x_best = np.arange(0, best.shape[0]) * 25
+        print('ES Best', x_best.shape)
+
+
     colors = Category10[8]
-
     fig = figure(width=800, height=600, title='Rewards, Doom')
-    fig.circle(x, data[:, 1], legend='Max R', line_color=colors[0], fill_color=colors[0])
-    fig.circle(x, data[:, 2], legend='Mean R', line_color=colors[1], fill_color=colors[1])
-    fig.circle(x, data[:, 3], legend='Min R', line_color=colors[2], fill_color=colors[2])
+    fig.circle(x, data[:, 1], legend='Dream, Max R', line_color=colors[0], fill_color=colors[0])
+    fig.circle(x, data[:, 2], legend='Dream, Mean R', line_color=colors[1], fill_color=colors[1])
+    fig.circle(x, data[:, 3], legend='Dream, Min R', line_color=colors[2], fill_color=colors[2])
+
+    fig.line(x_best, best[:, 1], legend='Real, Max R', line_color=colors[0])
+    fig.line(x_best, best[:, 0], legend='Real, Mean R', line_color=colors[1])
+    fig.line(x_best, best[:, 2], legend='Real, Min R', line_color=colors[2])
     return fig
 
 
@@ -57,11 +69,10 @@ def parse_rnn(log_file):
         data = re.findall(regex, f.read())
         data = [[float(x) for x in row] for row in data]
         data = np.array(data)
+        x = np.arange(0, data.shape[0])
+        print('RNN', data.shape)
 
-    print('RNN', data.shape)
-    x = np.arange(0, data.shape[0])
     colors = Category10[8]
-
     fig = figure(width=800, height=600, title='Loss, RNN Model')
     fig.circle(x, data[:, 0], legend='Z Loss', line_color=colors[0], fill_color=colors[0])
     fig.circle(x, data[:, 1], legend='R Loss', line_color=colors[1], fill_color=colors[1])
@@ -75,11 +86,10 @@ def parse_vae(log_file):
         data = re.findall(regex, f.read())
         data = [[float(x) for x in row] for row in data]
         data = np.array(data)
+        x = np.arange(0, data.shape[0])
+        print('VAE', data.shape)
 
-    print('VAE', data.shape)
-    x = np.arange(0, data.shape[0])
     colors = Category10[8]
-
     fig = figure(width=800, height=600, title='Loss, VAE')
     fig.circle(x, data[:, 0], legend='Loss', line_color=colors[0], fill_color=colors[0])
     fig.circle(x, data[:, 1], legend='R Loss', line_color=colors[1], fill_color=colors[1])
