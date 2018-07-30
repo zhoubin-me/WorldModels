@@ -45,4 +45,3 @@ then
         --vae-save-ckpt ./ckpt/ \
         --rnn-save-ckpt ./ckpt/
 fi
-

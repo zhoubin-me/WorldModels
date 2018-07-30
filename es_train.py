@@ -65,10 +65,7 @@ def deflatten_controller(param_array):
     return controller
 
 
-def rollout(model_x, controller, zs):
-
-    model = copy.deepcopy(model_x)
-
+def rollout(model, controller, zs):
     rewards = []
     for epi in range(cfg.trials_per_pop):
         model.reset()
@@ -77,8 +74,15 @@ def rollout(model_x, controller, zs):
             z = torch.from_numpy(z).float().unsqueeze(0)
             x = torch.cat((model.hx.detach(), model.cx.detach(), z), dim=1)
             y = controller(x)
-            m = Categorical(F.softmax(y, dim=1))
-            action = m.sample()
+            # m = Categorical(F.softmax(y, dim=1))
+            # action = m.sample()
+            y = y.item()
+            if y > 1 / 3.0:
+                action = torch.LongTensor([1])
+            elif y < -1 / 3.0:
+                action = torch.LongTensor([2])
+            else:
+                action = torch.LongTensor([0])
 
             logmix, mu, logstd, done_p = model.step(z.unsqueeze(0), action.unsqueeze(0))
 
@@ -103,14 +107,11 @@ def rollout(model_x, controller, zs):
             if done_p.squeeze().item() > 0:
                 break
         rewards.append(step)
-    return np.mean(rewards)
+    return np.array(rewards)
 
 
-def evaluate(model_x, vae_x, controller_x):
+def evaluate(model, vae, controller):
     from collect_data import DoomTakeOver
-    model = copy.deepcopy(model_x)
-    vae = copy.deepcopy(vae_x)
-    controller = copy.deepcopy(controller_x)
     env = DoomTakeOver()
     rewards = []
     for epi in range(cfg.trials_per_pop):
@@ -143,9 +144,16 @@ def slave(comm):
     vae.load_state_dict(torch.load(cfg.vae_save_ckpt, map_location=lambda storage, loc: storage)['model'])
     model = RNNModel()
     model.load_state_dict(torch.load(cfg.rnn_save_ckpt, map_location=lambda storage, loc: storage)['model'])
-    print('Worker {} Started'.format(comm.rank))
     count = 1
     status = MPI.Status()
+
+    gpuid = comm.rank % 4
+    # device = torch.device('cuda:{}'.format(gpuid))
+    # vae.to(device)
+    # model.to(device)
+    print('Worker {} Started, model on GPU {}'.format(comm.rank, gpuid))
+
+
 
     while True:
         solution = comm.recv(source=0, tag=MPI.ANY_TAG, status=status)
@@ -156,8 +164,9 @@ def slave(comm):
             zs = [sample_init_z(mus, logvars) for _ in range(cfg.trials_per_pop)]
             controller = deflatten_controller(solution)
             reward = rollout(model, controller, zs)
-            comm.send(reward, dest=0, tag=2)
-            print('Worker {} finished solution {}'.format(comm.rank, count))
+            print('Worker {} finished solution {}, reward: mean {} | max {} | min {} | std {}'.format(
+                comm.rank, count, reward.mean(), reward.max(), reward.min(), reward.std()))
+            comm.send(reward.mean(), dest=0, tag=2)
             count += 1
         elif tag == 3:
             print('Worker {} evaluate current solution'.format(comm.rank))
@@ -165,7 +174,6 @@ def slave(comm):
             reward = evaluate(model, vae, controller)
             comm.send(reward, dest=0, tag=2)
 
-        print('Worker')
 
 
 def master(comm):
@@ -176,7 +184,6 @@ def master(comm):
 
 
     for step in range(cfg.es_steps):
-        # init_zs = [[sample_init_z(mus, logvars) for _ in range(cfg.trials_per_pop)] for _ in range(cfg.population_size)]
         solutions = es.ask()
         for idx, solution in enumerate(solutions):
             comm.send(solution, dest=idx+1, tag=1)
@@ -199,8 +206,13 @@ def master(comm):
         es.tell(solutions, cost.tolist())
         print(reg_cost, r_cost)
 
+        if step % 25 == 0:
+            current_param = es.result[5]
+            current_controller = deflatten_controller(current_param)
+            save_path = "{}/controller_{}_step_{:05d}.pth".format(cfg.model_save_dir, cfg.timestr, step)
+            torch.save({'model': current_controller.state_dict()}, save_path)
 
-        if step % cfg.eval_step == 0:
+        if (step + 1) % 9999 == 0:
             best_param = es.result[0]
             current_param = es.result[5]
             best_reward = - es.result[1]
@@ -223,8 +235,6 @@ def master(comm):
 
             info = "EVAL--Step {:d}\t Max_R {:4f}\t Mean_R {:4f}\t Min_R {:4f}".format(step, rewards.max(), rewards.mean(), rewards.min())
             logger.log(info)
-            save_path = "{}/controller_{}_step_{:05d}.pth".format(cfg.model_save_dir, cfg.timestr, step)
-            torch.save({'model': current_controller.state_dict()}, save_path)
 
 def es_train():
     comm = MPI.COMM_WORLD

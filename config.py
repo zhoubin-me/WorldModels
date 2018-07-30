@@ -56,8 +56,8 @@ class Config:
     es_sigma = 0.1
     es_w_reg = 0.01
 
-    num_workers = 20
-    population_size = 20
+    num_workers = 64
+    population_size = 64
     temperature = 1.15
     trials_per_pop = 16
     eval_step = 25

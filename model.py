@@ -112,9 +112,8 @@ class Controller(nn.Module):
         super(Controller, self).__init__()
         self.fc = nn.Sequential(
                 # hx_size + cx_size + z_size
-                nn.Linear(cfg.rnn_size + cfg.rnn_size + cfg.vae_z_size, 64),
-                nn.ReLU(True),
-                nn.Linear(64, len(cfg.game_actions)),
+                nn.Linear(cfg.rnn_size + cfg.rnn_size + cfg.vae_z_size, 1, bias=False),
+                nn.Tanh()
                 )
 
     def forward(self, x):
