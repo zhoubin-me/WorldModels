@@ -66,8 +66,8 @@ if __name__ == '__main__':
     if rank == 0:
         f = open('result.txt', 'a')
         rewards = []
-        for idx in range(size):
-            reward = comm.recv(source=idx+1, tag=1)
+        for idx in range(1, size):
+            reward = comm.recv(source=idx, tag=1)
             print('Master received rewards from slave {}'.format(idx))
             rewards.append(reward)
         rewards = np.array(rewards)
@@ -78,15 +78,3 @@ if __name__ == '__main__':
         print(info)
     else:
         slave(comm)
-
-
-
-
-
-
-
-
-
-
-
-

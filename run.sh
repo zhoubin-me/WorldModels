@@ -39,9 +39,8 @@ then
         --rnn-save-ckpt ./ckpt/rnn_2018-Jul-29@20:37:43_e390.pth
 elif [ $1 -eq 6 ]
 then
-    # 5. Play Model
+    # 6. Eval Controller
     rm temp/*.png
-    export CUDA_VISIBLE_DEVICES=0,1
     for i in $(seq -f "%05g" 0 25 225)
     do
         mpirun -np 17 --hostfile hosts.txt python eval.py \
@@ -49,4 +48,11 @@ then
             --rnn-save-ckpt ./ckpt/rnn_2018-Jul-29@20_37_43_e390.pth \
             --ctrl-save-ckpt ./ckpt/controller_2018-Jul-30@15_08_02_step_$i.pth
     done
+elif [ $1 -eq 7 ]
+then
+    # 7. Plot Result
+    python parse_plot.py \
+        --vae ./logs/vae_train_2018-Jul-29@18_08_14.log \
+        --rnn ./logs/rnn_train_2018-Jul-29@20_37_43.log \
+        --es ./logs/es_train_2018-Jul-30@15_08_02.log
 fi
