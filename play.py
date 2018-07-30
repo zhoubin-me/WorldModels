@@ -1,233 +1,119 @@
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Categorical
 
 import glob
+import cv2
 import numpy as np
-from joblib import Parallel, delayed
-from collections import OrderedDict
 import os
 
+from collect_data import DoomTakeOver
 from model import VAE, RNNModel, Controller
-from collect_data import initialize_vizdoom, preprocess
-from es_train import sample_init_z, load_or_save_init_z
-from main import cfg
+from es_train import load_init_z, sample_init_z
+from config import cfg
+from common import Logger
 
-
-
-def write_video(frames, fname, reward=None):
+def write_video(frames, fname, size=(64, 64)):
     fourcc = cv2.VideoWriter_fourcc(*'DIVX')
-    # video = cv2.VideoWriter(fname, fourcc, 10, (64, 148))
-    video = cv2.VideoWriter(fname, fourcc, 10, (64, 64))
+    video = cv2.VideoWriter(fname, fourcc, 20, size)
     for frame in frames:
         video.write(frame.astype(np.uint8))
 
-def play_in_dream():
-    mus, logvars = load_or_save_init_z()
-
-    vae = VAE()
-    vae_stat_dict = torch.load(cfg.vae_save_ckpt)['model']
-    new_vae_stat_dict = OrderedDict()
-    for k, v in vae_stat_dict.items():
-        new_vae_stat_dict[k[7:]] = v
-    vae.load_state_dict(new_vae_stat_dict)
-
-    model = RNNModel()
-    rnn_stat_dict = torch.load(cfg.rnn_save_ckpt)['model']
-    new_rnn_stat_dict = OrderedDict()
-    for k, v in rnn_stat_dict.items():
-        new_rnn_stat_dict[k[7:]] = v
-    model.load_state_dict(new_rnn_stat_dict)
-
-
-    if cfg.ctrl_save_ckpt is not None:
-        controller = Controller()
-        ctrl_stat_dict = torch.load(cfg.ctrl_save_ckpt)['model']
-        controller.load_state_dict(ctrl_stat_dict)
-    else:
-        controller = None
-
-    rewards = []
-    frames = []
-
-    for epi in range(cfg.trials_per_pop):
-        done = 0
-        model.reset()
-        frames_ = []
-        z = sample_init_z(mus, logvars)
-
-        for step in range(cfg.max_steps):
-
-            z = torch.from_numpy(z).float().unsqueeze(0)
-            if controller is not None:
-                x = torch.cat((model.hx.detach(), model.cx.detach(), z), dim=1)
-                y = controller(x)
-                m = Categorical(F.softmax(y, dim=1))
-                action = m.sample()
-            else:
-                action = torch.randint(0, 2, (1,))
-
-
-            frames_ += [vae.decode(z).detach().numpy().transpose(2, 3, 1, 0)[:, :, :, 0] * 255.0]
-
-            logmix, mu, logstd, done_p = model.step(z.unsqueeze(0), action.unsqueeze(0))
-            logmix = logmix / cfg.temperature
-            logmix -= logmix.max()
-            logmix = torch.exp(logmix)
-
-            m = Categorical(logmix)
-            idx = m.sample()
-
-            new_mu = torch.FloatTensor([mu[i, j] for i, j in enumerate(idx)])
-            new_logstd = torch.FloatTensor([logstd[i, j] for i, j in enumerate(idx)])
-            z_next = new_mu + new_logstd.exp() * torch.randn_like(new_mu) * np.sqrt(cfg.temperature)
-
-            z = z_next.detach().numpy()
-            if done_p.squeeze().item() > 0:
-                break
-
-        rewards.append(step)
-        frames.append(frames_)
-
-    idx = rewards.index(max(rewards))
-    frames = frames[idx]
-
-    print(rewards, rewards[idx], np.mean(rewards))
-    print(len(frames))
-
-    write_video(frames, 'temp/dream.avi')
-    os.system('scp temp/dream.avi bzhou@10.80.43.125:/home/bzhou/Dropbox/share')
-
-
-def play_in_real():
-
-    vae = VAE()
-    vae_stat_dict = torch.load(cfg.vae_save_ckpt)['model']
-    new_vae_stat_dict = OrderedDict()
-    for k, v in vae_stat_dict.items():
-        new_vae_stat_dict[k[7:]] = v
-    vae.load_state_dict(new_vae_stat_dict)
-
-    model = RNNModel()
-    rnn_stat_dict = torch.load(cfg.rnn_save_ckpt)['model']
-    new_rnn_stat_dict = OrderedDict()
-    for k, v in rnn_stat_dict.items():
-        new_rnn_stat_dict[k[7:]] = v
-    model.load_state_dict(new_rnn_stat_dict)
-
-    if cfg.ctrl_save_ckpt is not None:
-        controller = Controller()
-        ctrl_stat_dict = torch.load(cfg.ctrl_save_ckpt)['model']
-        controller.load_state_dict(ctrl_stat_dict)
-    else:
-        controller = None
-
-    game = initialize_vizdoom()
-    actions = cfg.game_actions
-    frames = []
-    rewards = []
-
-    for epi in range(cfg.trials_per_pop):
-        game.new_episode()
-        repeat = np.random.randint(1, 11)
-        model.reset()
-        frames_ = []
-        for step in range(cfg.max_steps):
-            s1 = game.get_state().screen_buffer
-            s1 = preprocess(s1)
-            frames_ += [s1]
-            s1 = torch.from_numpy(s1.transpose(2, 0, 1)).unsqueeze(0).float() / 255.0
-            mu, logvar, x, z = vae(s1)
-
-            if controller is not None:
-                inp = torch.cat((model.hx.detach(), model.cx.detach(), z), dim=1)
-                y = controller(inp)
-                m = Categorical(F.softmax(y, dim=1))
-                action = m.sample().item()
-            else:
-                action = np.random.randint(0, 2)
-            action = actions[action]
-
-
-            reward = game.make_action(action)
-            done = game.is_episode_finished()
-            if done:
-                break
-
-        rewards.append(step)
-        frames.append(frames_)
-    idx = rewards.index(max(rewards))
-    frames = frames[idx]
-
-    print(rewards, rewards[idx], np.mean(rewards))
-    print(len(frames))
-
-
-    write_video(frames, 'temp/play.avi')
-    os.system('scp temp/play.avi bzhou@10.80.43.125:/home/bzhou/Dropbox/share')
-
-def play_data():
-    import glob
-    data = glob.glob('../../data/doom_frames/*.npz')
-    data = np.random.choice(data)
-    frames = np.load(data)['sx']
-
-    features = '{}/{}'.format(cfg.seq_extract_dir, data.split('/')[-1])
-    features = np.load(features)
-    mus = features['mu']
-    logvars = features['logvar']
-    z = mus + np.exp(logvars / 2.0) * np.random.randn(*mus.shape)
-    z = torch.from_numpy(z).float()
-
-
-    vae = VAE()
-    vae_stat_dict = torch.load('../../ckpt/doom_model_exp/vae_2018-Jul-18@02:51:16_epoch_011.pth')['model']
-    new_vae_stat_dict = OrderedDict()
-    for k, v in vae_stat_dict.items():
-        new_vae_stat_dict[k[7:]] = v
-    vae.load_state_dict(new_vae_stat_dict)
-
-    x = vae.decode(z).detach().numpy().transpose(0, 2, 3, 1) * 255.0
-    new_frames = np.zeros((x.shape[0], x.shape[1]*2 + 20, x.shape[2], x.shape[3]))
-    new_frames[:, :x.shape[1], :, :] = x
-    new_frames[:, -x.shape[1]:, :, :] = frames.astype(np.float)
-
-    # new_frames = np.concatenate((x.astype(np.uint8), frames), axis=1)
-    print(new_frames, new_frames.dtype)
-
-    write_video(new_frames, 'temp/data.avi')
-    os.system('scp temp/data.avi bzhou@10.80.43.125:/home/bzhou/Dropbox/share')
-
-
+def write_images(frames):
+    for idx, frame in enumerate(frames):
+        cv2.imwrite('temp/frame_{:05d}.png'.format(idx), frame)
 
 def test_frames():
-    import glob
-    import cv2
-    import numpy as np
-    import os
     data = glob.glob('../../data/doom_frames/*.npz')
     data = np.random.choice(data)
     frames = np.load(data)['sx']
 
-    write_video(frames, 'temp/data.avi')
-    os.system('cp temp/data.avi /home/bzhou/Dropbox/share')
+    print(frames.shape, 'data.avi')
 
-test_frames()
+    write_video(frames, 'data.avi')
+    os.system('mv data.avi /home/bzhou/Dropbox/share')
 
-# play_data()
+def test_vae():
+    data = glob.glob('../../data/doom_frames/*.npz')
+    data = np.random.choice(data)
+    frames = np.load(data)['sx']
+
+    model = VAE().cuda(3)
+    stat_dict = torch.load(cfg.vae_save_ckpt)['model']
+    model.load_state_dict(stat_dict)
+    x = frames.transpose(0, 3, 1, 2)
+    x = torch.from_numpy(x).float().cuda(3) / 255.0
+    _, _, x_rec, _ = model(x)
+    x_rec = x_rec.detach().cpu().numpy().transpose(0, 2, 3, 1) * 255.0
+
+    new_frames = np.zeros((x_rec.shape[0], x_rec.shape[1]*2 + 20, x_rec.shape[2], x_rec.shape[3]))
+    new_frames[:, :x_rec.shape[1], :, :] = x_rec
+    new_frames[:, -x_rec.shape[1]:, :, :] = frames.astype(np.float)
+
+    print(new_frames.shape, 'vae.avi')
+
+    write_video(new_frames, 'vae.avi', (64, 148))
+    os.system('mv vae.avi /home/bzhou/Dropbox/share')
+
+def test_rnn():
+    mus, logvars = load_init_z()
+
+    vae = VAE()
+    vae.load_state_dict(torch.load(cfg.vae_save_ckpt)['model'])
+    model = RNNModel()
+    model.load_state_dict(torch.load(cfg.rnn_save_ckpt)['model'])
+
+    controller = Controller()
+    controller.load_state_dict(torch.load(cfg.ctrl_save_ckpt)['model'])
+
+    model.reset()
+    z = sample_init_z(mus, logvars)
+    frames = []
+
+    for step in range(cfg.max_steps):
+        z = torch.from_numpy(z).float().unsqueeze(0)
+        curr_frame = vae.decode(z).detach().numpy()
+
+        frames.append(curr_frame.transpose(0, 2, 3, 1)[0] * 255.0)
+        # cv2.imshow('game', frames[-1])
+        # k = cv2.waitKey(33)
 
 
+        inp = torch.cat((model.hx.detach(), model.cx.detach(), z), dim=1)
+        y = controller(inp)
+        y = y.item()
+        if y > 1 / 3.0:
+            action = torch.LongTensor([1])
+        elif y < -1 / 3.0:
+            action = torch.LongTensor([2])
+        else:
+            action = torch.LongTensor([0])
 
 
+        logmix, mu, logstd, done_p = model.step(z.unsqueeze(0), action.unsqueeze(0))
 
+        # logmix = logmix - reduce_logsumexp(logmix)
+        logmix_max = logmix.max(dim=1, keepdim=True)[0]
+        logmix_reduce_logsumexp = (logmix - logmix_max).exp().sum(dim=1, keepdim=True).log() + logmix_max
+        logmix = logmix - logmix_reduce_logsumexp
 
+        # Adjust temperature
+        logmix = logmix / cfg.temperature
+        logmix -= logmix.max(dim=1, keepdim=True)[0]
+        logmix = F.softmax(logmix, dim=1)
 
+        m = Categorical(logmix)
+        idx = m.sample()
 
+        new_mu = torch.FloatTensor([mu[i, j] for i, j in enumerate(idx)])
+        new_logstd = torch.FloatTensor([logstd[i, j] for i, j in enumerate(idx)])
+        z_next = new_mu + new_logstd.exp() * torch.randn_like(new_mu) * np.sqrt(cfg.temperature)
 
+        z = z_next.detach().numpy()
+        if done_p.squeeze().item() > 0:
+            break
 
-
-
-
-
-
+    print('RNN Reward {}'.format(step))
+    write_images(frames)
+    write_video(frames, 'rnn.avi')
+    os.system('mv rnn.avi /home/bzhou/Dropbox/share')

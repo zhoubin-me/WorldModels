@@ -6,12 +6,16 @@ import os
 
 
 class DoomTakeOver:
-    def __init__(self):
+    def __init__(self, visible=False):
         game = DoomGame()
         game.load_config('./scenarios/take_cover.cfg')
-        game.set_screen_resolution(ScreenResolution.RES_160X120)
+        if visible:
+            # game.set_screen_resolution(ScreenResolution.RES_640X480)
+            game.set_screen_resolution(ScreenResolution.RES_160X120)
+        else:
+            game.set_screen_resolution(ScreenResolution.RES_160X120)
         game.set_screen_format(ScreenFormat.BGR24)
-        game.set_window_visible(False)
+        game.set_window_visible(visible)
         game.set_mode(Mode.PLAYER)
         game.init()
         self.actions = [[True, False], [False, True], [False, False]]
