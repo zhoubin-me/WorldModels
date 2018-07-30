@@ -6,16 +6,12 @@ import torch.nn.functional as F
 from torch.utils.data import Dataset, ConcatDataset, DataLoader
 
 import glob
-import cv2
-import pdb
 import time
 
 from joblib import Parallel, delayed
-from multiprocessing import Process
-from collections import OrderedDict
 
-from main import cfg
-from common import Logger, EarlyStopping, ReduceLROnPlateau
+from config import cfg
+from common import Logger
 from model import VAE
 
 
@@ -30,6 +26,8 @@ class NumpyData(Dataset):
     def __getitem__(self, idx):
         return self.data[idx]
 
+def load_npz(f):
+    return np.load(f)['sx'].transpose(0, 3, 1, 2)
 
 def vae_train():
     logger = Logger("{}/vae_train_{}.log".format(cfg.logger_save_dir, cfg.timestr))
@@ -37,27 +35,24 @@ def vae_train():
 
     logger.log("Loading Dataset")
 
-    def load_npz(f):
-        return np.load(f)['sx'].transpose(0, 3, 1, 2)
-
     data_list = glob.glob(cfg.seq_save_dir +'/*.npz')
-    data_list.sort()
     datas = Parallel(n_jobs=cfg.num_cpus, verbose=1)(delayed(load_npz)(f) for f in data_list)
 
     datasets = [NumpyData(x) for x in datas]
     total_data = ConcatDataset(datasets)
-    train_data_loader = DataLoader(total_data, batch_size=cfg.vae_batch_size, shuffle=True)
+    train_data_loader = DataLoader(total_data, batch_size=cfg.vae_batch_size, shuffle=True, num_workers=10, pin_memory=False)
+
+    print('Total frames: {}'.format(len(total_data)))
 
     model = torch.nn.DataParallel(VAE()).cuda()
     optimizer = torch.optim.Adam(model.parameters(), lr=cfg.vae_lr)
-    scheduler = ReduceLROnPlateau(optimizer, 'min', factor=0.5, patience=5)
-    earlystopping = EarlyStopping('min', patience=30)
 
-
-    best_loss = None
     for epoch in range(cfg.vae_num_epoch):
         current_loss = 0
+        now = time.time()
         for idx, imgs in enumerate(train_data_loader):
+            data_duration = time.time() - now
+
             now = time.time()
             imgs = imgs.float().cuda() / 255.0
             mu, logvar, imgs_rc, z = model(imgs)
@@ -75,98 +70,22 @@ def vae_train():
             optimizer.step()
             current_loss += loss.item() * imgs.size(0)
 
-            duration = time.time() - now
-
+            model_duration = time.time() - now
+            total_duration = data_duration + model_duration
             if idx % 10 == 0:
                 info = "Epoch {:2d}\t Step [{:5d}/{:5d}]\t Loss {:6.3f}\t R_Loss {:6.3f}\t \
-                        KL_Loss {:6.3f}\t Maxvar {:6.3f}\t Speed {:6.3f}".format(
+                        KL_Loss {:6.3f}\t Maxvar {:6.3f}\t Speed {:6.3f}\t Time: [{:.5f}/{:.5f}]\t".format(
                     epoch, idx, len(train_data_loader), loss.item(), r_loss.item(),
-                    kl_loss.item(), logvar.max().item(), imgs.size(0) / duration)
+                    kl_loss.item(), logvar.max().item(), imgs.size(0) / total_duration, data_duration, total_duration)
                 logger.log(info)
 
-        current_loss /= len(total_data)
-        if best_loss is None:
-            best_loss = current_loss
+            now = time.time()
 
-            to_save_data = {
-                    'model': model.state_dict(),
-                    'loss': best_loss,
-                    'epoch': epoch}
-            to_save_path = '{}/vae_{}_best.pth'.format(cfg.model_save_dir, cfg.timestr)
 
-        elif current_loss > best_loss:
-            to_save_data = {
-                    'model': model.state_dict(),
-                    'loss': current_loss,
-                    'epoch': epoch}
-            to_save_path = '{}/vae_{}_latest.pth'.format(cfg.model_save_dir, cfg.timestr)
-
-        else:
-            best_loss = current_loss
-
-            to_save_data = {
-                    'model': model.state_dict(),
-                    'loss': best_loss,
-                    'epoch': epoch}
-            to_save_path = '{}/vae_{}_best.pth'.format(cfg.model_save_dir, cfg.timestr)
-
+        to_save_data = {'model': model.module.state_dict(), 'loss': current_loss}
+        to_save_path = '{}/vae_{}_e{:03d}.pth'.format(cfg.model_save_dir, cfg.timestr, epoch)
         torch.save(to_save_data, to_save_path)
-        scheduler.step(current_loss)
-        earlystopping.step(current_loss)
-
-        logger.log('At Epoch {}, Current Loss {:6.3f}, Best Loss {:6.3f}'.format(
-            epoch, current_loss, best_loss))
-
-        if earlystopping.stop:
-            break
-
-def convert(fs, idx, N):
-
-    model = VAE().cuda(idx)
-    old_stat_dict = torch.load(cfg.vae_save_ckpt)['model']
-    stat_dict = OrderedDict()
-    for k, v in old_stat_dict.items():
-        stat_dict[k[7:]] = v
-    model.load_state_dict(stat_dict)
 
 
-    for n, f in enumerate(fs):
-        data = np.load(f)
-        imgs = data['sx'].transpose(0, 3, 1, 2)
-        actions = data['ax']
-        rewards = data['rx']
-        dones = data['dx']
-        x = torch.from_numpy(imgs).float().cuda(idx) / 255.0
-        mu, logvar, _, z = model(x)
-        save_path = "{}/{}".format(cfg.seq_extract_dir, f.split('/')[-1])
-
-        np.savez_compressed(save_path,
-                mu=mu.detach().cpu().numpy(),
-                logvar=logvar.detach().cpu().numpy(),
-                dones=dones,
-                rewards=rewards,
-                actions=actions)
-
-        if n % 10 == 0:
-            print('Process %d: %5d / %5d' % (idx, n, N))
-
-def vae_extract():
-    logger = Logger("{}/vae_extract_{}.log".format(cfg.logger_save_dir, cfg.timestr))
-    logger.log(cfg.info)
-
-    print("Loading Dataset")
-    data_list = glob.glob(cfg.seq_save_dir +'/*.npz')
-    data_list.sort()
-    N = len(data_list) // 4
-
-    procs = []
-    for idx in range(4):
-        p = Process(target=convert, args=(data_list[idx*N:(idx+1)*N], idx, N))
-        procs.append(p)
-        p.start()
-        time.sleep(1)
-
-    for p in procs:
-        p.join()
-
-
+if __name__ == '__main__':
+    vae_train()

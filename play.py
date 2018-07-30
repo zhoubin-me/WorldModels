@@ -7,7 +7,6 @@ import glob
 import numpy as np
 from joblib import Parallel, delayed
 from collections import OrderedDict
-import cv2
 import os
 
 from model import VAE, RNNModel, Controller
@@ -200,6 +199,21 @@ def play_data():
     write_video(new_frames, 'temp/data.avi')
     os.system('scp temp/data.avi bzhou@10.80.43.125:/home/bzhou/Dropbox/share')
 
+
+
+def test_frames():
+    import glob
+    import cv2
+    import numpy as np
+    import os
+    data = glob.glob('../../data/doom_frames/*.npz')
+    data = np.random.choice(data)
+    frames = np.load(data)['sx']
+
+    write_video(frames, 'temp/data.avi')
+    os.system('cp temp/data.avi /home/bzhou/Dropbox/share')
+
+test_frames()
 
 # play_data()
 

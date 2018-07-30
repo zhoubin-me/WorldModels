@@ -1,64 +1,75 @@
 import numpy as np
-
-from concurrent.futures import ThreadPoolExecutor as TPE
-from vizdoom import *
-
-import os
 import cv2
-
-from main import cfg
-from common import Logger
-
-def preprocess(img):
-    img = cv2.resize(img, cfg.resolution)
-    return img
+from vizdoom import *
+from config import cfg
+import os
 
 
-def initialize_vizdoom():
-    print("Initializing doom...")
-    game = DoomGame()
-    game.load_config(cfg.game_cfg_path)
-    game.set_window_visible(False)
-    game.set_mode(Mode.PLAYER)
-    game.set_screen_format(ScreenFormat.RGB24)
-    game.set_screen_resolution(ScreenResolution.RES_640X480)
-    game.init()
-    print("Doom initialized.")
-    return game
+class DoomTakeOver:
+    def __init__(self):
+        game = DoomGame()
+        game.load_config('./scenarios/take_cover.cfg')
+        game.set_screen_resolution(ScreenResolution.RES_160X120)
+        game.set_screen_format(ScreenFormat.BGR24)
+        game.set_window_visible(False)
+        game.set_mode(Mode.PLAYER)
+        game.init()
+        self.actions = [[True, False], [False, True], [False, False]]
+        self.game = game
+        self.num_actions = len(self.actions)
 
-def collect_once(index):
-    actions = cfg.game_actions
+    def preprocess(self, img):
+        img = cv2.resize(img, (64, 64))
+        return img
+
+    def reset(self):
+        self.game.new_episode()
+        img = self.game.get_state().screen_buffer
+        img = self.preprocess(img)
+        return img
+
+    def step(self, action):
+        action = self.actions[action]
+        reward = self.game.make_action(action)
+        done = self.game.is_episode_finished()
+        if not done:
+            img = self.game.get_state().screen_buffer
+            img = self.preprocess(img)
+        else:
+            img = None
+        return img, reward, done, None
+
+
+def collect_once(idx):
+    env = DoomTakeOver()
     nepi = cfg.total_seq // cfg.num_cpus + 1
-    game = initialize_vizdoom()
     for epi in range(nepi):
-        game.new_episode()
-        repeat = np.random.randint(1, 11)
+        obs = env.reset()
+        repeat = np.random.randint(1, cfg.action_repeat)
         traj = []
-
         for step in range(cfg.max_seq_len):
-            s1 = game.get_state().screen_buffer
-            s1 = preprocess(s1)
             if step % repeat == 0:
-                a = np.random.randint(0, len(actions))
-                action = actions[a]
-                repeat = np.random.randint(1, 11)
-            reward = game.make_action(action)
-            done = game.is_episode_finished()
-            traj += [(s1, a, reward, done)]
+                action = np.random.randint(0, 3)
+            obs_next, reward, done, _ = env.step(action)
+            traj += [(obs, action, reward, done)]
+            obs = obs_next
             if done:
                 break
 
         if step > cfg.min_seq_len:
             sx, ax, rx, dx = [np.array(x, dtype=np.uint8) for x in zip(*traj)]
             rind = np.random.randint(0, 99999)
-            save_path = "{}/{:04d}_{:05d}_{:05d}.npz".format(cfg.seq_save_dir, index, epi, rind)
+            save_path = "{}/{:04d}_{:05d}_{:05d}.npz".format(cfg.seq_save_dir, idx, epi, rind)
             np.savez_compressed(save_path, sx=sx, ax=ax, rx=rx, dx=dx)
 
-        print("Worker {}: {}/{}".format(index, epi, nepi))
+        print("Worker {}: {}/{}, frames {}".format(idx, epi, nepi, len(traj)))
 
 def collect_all():
-    logger = Logger("{}/data_collection_{}.log".format(cfg.logger_save_dir, cfg.timestr))
-    logger.log(cfg.info)
-    with TPE(max_workers=cfg.num_cpus) as e:
-        e.map(collect_once, [i for i in range(cfg.num_cpus)])
+    from mpi4py import MPI
+    comm = MPI.COMM_WORLD
+    size = comm.size
+    rank = comm.rank
+    collect_once(rank)
 
+if __name__ == '__main__':
+    collect_all()
