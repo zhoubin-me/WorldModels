@@ -44,7 +44,7 @@ then
     export CUDA_VISIBLE_DEVICES=0,1
     for i in $(seq -f "%05g" 0 25 225)
     do
-        mpirun -np 17 --hostfile hosts.txt python test.py \
+        mpirun -np 17 --hostfile hosts.txt python eval.py \
             --vae-save-ckpt ./ckpt/vae_2018-Jul-29@18_08_14_e012.pth \
             --rnn-save-ckpt ./ckpt/rnn_2018-Jul-29@20_37_43_e390.pth \
             --ctrl-save-ckpt ./ckpt/controller_2018-Jul-30@15_08_02_step_$i.pth

@@ -55,7 +55,7 @@ def slave(comm):
         rewards.append(step)
         print('Workder {} got reward {} at epi {}'.format(comm.rank, step, epi))
     rewards = np.array(rewards)
-    comm.send(rewards, dest=0, tag=0)
+    comm.send(rewards, dest=0, tag=1)
     print('Worker {} sent rewards to master'.format(comm.rank))
 
 if __name__ == '__main__':
@@ -64,15 +64,14 @@ if __name__ == '__main__':
     rank = comm.rank
     size = comm.size
     if rank == 0:
-        f = open('eval.txt', 'a')
+        f = open('result.txt', 'a')
         rewards = []
         for idx in range(size):
             reward = comm.recv(source=idx+1, tag=1)
             print('Master received rewards from slave {}'.format(idx))
             rewards.append(reward)
         rewards = np.array(rewards)
-        info = 'Mean {}\t Max {}\t Min {}\t Std {}'.format(
-                rewards.mean(), rewards.max(), rewards.min(), rewards.std())
+        info = 'Mean {}\t Max {}\t Min {}\t Std {}'.format(rewards.mean(), rewards.max(), rewards.min(), rewards.std())
         f.write(info)
         f.flush()
         f.close()
