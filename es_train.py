@@ -185,8 +185,13 @@ def master(comm):
         if step % 25 == 0:
             current_param = es.result[5]
             current_controller = deflatten_controller(current_param)
-            save_path = "{}/controller_{}_step_{:05d}.pth".format(cfg.model_save_dir, cfg.timestr, step)
+            save_path = "{}/controller_curr_{}_step_{:05d}.pth".format(cfg.model_save_dir, cfg.timestr, step)
             torch.save({'model': current_controller.state_dict()}, save_path)
+
+            best_param = es.result[0]
+            best_controller = deflatten_controller(best_param)
+            save_path = "{}/controller_best_{}_step_{:05d}.pth".format(cfg.model_save_dir, cfg.timestr, step)
+            torch.save({'model': best_controller.state_dict()}, save_path)
 
 def es_train():
     comm = MPI.COMM_WORLD
