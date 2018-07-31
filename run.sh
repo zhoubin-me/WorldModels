@@ -21,9 +21,9 @@ then
 
 elif [ $1 -eq 3 ]
 then
-    # 3. Extract Dataset
+    # 3. Extract Dataset vae_train_2018_Jul_31-23_00_45
     python vae_extract.py \
-        --vae-save-ckpt ./ckpt/vae_2018-Jul-29@18:08:14_e012.pth
+        --vae-save-ckpt ./ckpt/vae_2018_Jul_31-23_00_45_e011.pth
 
 elif [ $1 -eq 4 ]
 then
@@ -35,24 +35,24 @@ elif [ $1 -eq 5 ]
 then
     # 5. Train Controller
     mpirun --hostfile hosts.txt python es_train.py \
-        --vae-save-ckpt ./ckpt/vae_2018-Jul-29@18:08:14_e012.pth \
-        --rnn-save-ckpt ./ckpt/rnn_2018-Jul-29@20:37:43_e390.pth
+        --vae-save-ckpt ./ckpt/vae_2018_Jul_31-23_00_45_e011.pth \
+        --rnn-save-ckpt ./ckpt/rnn_2018_Aug_01-01_23_14_e390.pth
 elif [ $1 -eq 6 ]
 then
     # 6. Eval Controller
     rm temp/*.png
-    for i in $(seq -f "%05g" 0 25 225)
+    for i in $(seq -f "%05g" 250 25 600)
     do
         mpirun -np 17 --hostfile hosts.txt python eval.py \
-            --vae-save-ckpt ./ckpt/vae_2018-Jul-29@18_08_14_e012.pth \
-            --rnn-save-ckpt ./ckpt/rnn_2018-Jul-29@20_37_43_e390.pth \
-            --ctrl-save-ckpt ./ckpt/controller_2018-Jul-30@15_08_02_step_$i.pth
+            --vae-save-ckpt ./ckpt/vae_2018_Jul_31-23_00_45_e011.pth \
+            --rnn-save-ckpt ./ckpt/rnn_2018_Aug_01-01_23_14_e390.pth
+            --ctrl-save-ckpt ./ckpt/controller_2018-Jul-30@15:08:02_step_$i.pth
     done
 elif [ $1 -eq 7 ]
 then
     # 7. Plot Result
     python parse_plot.py \
-        --vae ./logs/vae_train_2018-Jul-29@18_08_14.log \
-        --rnn ./logs/rnn_train_2018-Jul-29@20_37_43.log \
-        --es ./logs/es_train_2018-Jul-30@15_08_02.log
+        --vae ./logs/vae_train_2018-Jul-29@18:08:14.log \
+        --rnn ./logs/rnn_train_2018-Jul-29@20:37:43.log \
+        --es ./logs/es_train_2018-Jul-30@15:08:02.log
 fi

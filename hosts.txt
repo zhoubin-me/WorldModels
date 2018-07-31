@@ -1,1 +1,2 @@
 localhost slots=65
+# 10.80.43.30 slots=40

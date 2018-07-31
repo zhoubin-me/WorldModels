@@ -26,13 +26,13 @@ class Config:
 
     # VAE Setting
     vae_batch_size = 128
-    vae_num_epoch = 50
+    vae_num_epoch = 12
     vae_lr = 1e-4
     vae_image_size = 64
     vae_z_size = 64
     vae_kl_tolerance = 0.5
 
-    vae_save_ckpt = "./ckpt/vae_2018-Jul-29@18:08:14_e012.pth"
+    vae_save_ckpt = ""
 
 
     # RNN Model Setting
@@ -47,7 +47,7 @@ class Config:
     rnn_lr_decay = 0.99999
     rnn_r_loss_w = 9
 
-    rnn_save_ckpt = "./ckpt/rnn_2018-Jul-29@20:37:43_e080.pth"
+    rnn_save_ckpt = ""
 
 
     # Controller ES Setting
@@ -93,7 +93,7 @@ def parse(**kwargs):
         elif k != "help":
             raise ValueError('No such keyword: {}' % k)
 
-    cfg.timestr = time.strftime('%Y-%b-%d@%H:%M:%S')
+    cfg.timestr = time.strftime('%Y_%b_%d-%H_%M_%S')
 
 fire.Fire(parse)
 
