@@ -54,7 +54,7 @@ class Config:
     max_steps = 2100
     es_steps = 2000
     es_sigma = 0.1
-    es_w_reg = 0.01
+    es_w_reg = 5
 
     num_workers = 64
     population_size = 64

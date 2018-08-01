@@ -165,13 +165,19 @@ def master(comm):
         assert check.sum() == 0
         assert len(rewards) == cfg.num_workers
 
-        info = "Step {:d}\t Max_R {:4f}\t Mean_R {:4f}\t Min_R {:4f}".format(step, max(rewards), np.mean(rewards), min(rewards))
-        logger.log(info)
         r_cost = - np.array(rewards)
         reg_cost = l2_reg(solutions)
         cost =  reg_cost + r_cost
         es.tell(solutions, cost.tolist())
-        print(reg_cost, r_cost)
+
+        sigma = es.result[6]
+        rms_var = np.mean(sigma * sigma)
+
+
+
+        info = "Step {:d}\t Max_R {:4f}\t Mean_R {:4f}\t Min_R {:4f}\t RMS_Var {:4f}\t Reg_Cost {:4f}\t R_Cost {:4f}".format(
+                step, max(rewards), np.mean(rewards), min(rewards), rms_var, r_cost.mean(), reg_cost.mean())
+        logger.log(info)
 
         if step % 25 == 0:
             current_param = es.result[5]
