@@ -71,9 +71,9 @@ def rollout(model, controller, zs):
             if y > 1 / 3.0:
                 action = torch.LongTensor([1])
             elif y < -1 / 3.0:
-                action = torch.LongTensor([2])
-            else:
                 action = torch.LongTensor([0])
+            else:
+                action = torch.LongTensor([2])
 
             logmix, mu, logstd, done_p = model.step(z.unsqueeze(0), action.unsqueeze(0))
 
