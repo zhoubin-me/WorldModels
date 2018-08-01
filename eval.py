@@ -43,9 +43,9 @@ def slave(comm):
             if y > 1 / 3.0:
                 action = torch.LongTensor([1])
             elif y < -1 / 3.0:
-                action = torch.LongTensor([2])
-            else:
                 action = torch.LongTensor([0])
+            else:
+                action = torch.LongTensor([2])
 
             model.step(z.unsqueeze(0), action.unsqueeze(0))
             obs_next, reward, done, _ = env.step(action.item())

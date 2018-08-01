@@ -67,5 +67,5 @@ def save_init_z():
     np.savez_compressed('init_z.npz', mus=mus, logvars=logvars)
 
 if __name__ == '__main__':
-    vae_extract()
+    # vae_extract()
     save_init_z()
