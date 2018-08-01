@@ -7,9 +7,9 @@ import cv2
 import numpy as np
 import os
 
-from collect_data import DoomTakeOver
+from collect_data import DoomTakeCover
 from model import VAE, RNNModel, Controller
-from es_train import load_init_z, sample_init_z
+from es_train import load_init_z, sample_init_z, encode_action
 from config import cfg
 from common import Logger
 
@@ -27,9 +27,7 @@ def test_frames():
     data = glob.glob('../../data/doom_frames/*.npz')
     data = np.random.choice(data)
     frames = np.load(data)['sx']
-
     print(frames.shape, 'data.avi')
-
     write_video(frames, 'data.avi')
     os.system('mv data.avi /home/bzhou/Dropbox/share')
 
@@ -55,11 +53,12 @@ def test_vae():
     write_video(new_frames, 'vae.avi', (64, 148))
     os.system('mv vae.avi /home/bzhou/Dropbox/share')
 
-def test_rnn():
+def test_rnn(epi):
     mus, logvars = load_init_z()
 
     vae = VAE()
     vae.load_state_dict(torch.load(cfg.vae_save_ckpt)['model'])
+
     model = RNNModel()
     model.load_state_dict(torch.load(cfg.rnn_save_ckpt)['model'])
 
@@ -78,16 +77,10 @@ def test_rnn():
         # cv2.imshow('game', frames[-1])
         # k = cv2.waitKey(33)
 
-
         inp = torch.cat((model.hx.detach(), model.cx.detach(), z), dim=1)
         y = controller(inp)
         y = y.item()
-        if y > 1 / 3.0:
-            action = torch.LongTensor([1])
-        elif y < -1 / 3.0:
-            action = torch.LongTensor([2])
-        else:
-            action = torch.LongTensor([0])
+        action = encode_action(y)
 
 
         logmix, mu, logstd, done_p = model.step(z.unsqueeze(0), action.unsqueeze(0))
@@ -113,7 +106,13 @@ def test_rnn():
         if done_p.squeeze().item() > 0:
             break
 
-    print('RNN Reward {}'.format(step))
+    print('Episode {}: RNN Reward {}'.format(epi, step))
     write_images(frames)
-    write_video(frames, 'rnn.avi')
-    os.system('mv rnn.avi /home/bzhou/Dropbox/share')
+    write_video(frames, 'rnn_{}.avi'.format(epi))
+    os.system('mv rnn_{}.avi /home/bzhou/Dropbox/share'.format(epi))
+
+if __name__ == '__main__':
+    for epi in range(10):
+        test_rnn(epi)
+    # test_vae()
+    # test_frames()

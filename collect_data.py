@@ -53,6 +53,11 @@ class DoomTakeCover:
             img = None
         return img, reward, done, None
 
+class DreamDoomTakeCoverEnv:
+    def __init__(self):
+        self.vae = vae
+        self.rnn = rnn
+
 
 def collect_once(size, rank):
     env = DoomTakeCover()

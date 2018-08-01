@@ -41,12 +41,12 @@ elif [ $1 -eq 6 ]
 then
     # 6. Eval Controller
     rm temp/*.png
-    for i in $(seq -f "%05g" 250 25 600)
+    for i in $(seq -f "%05g" 0 25 25)
     do
         mpirun -np 17 --hostfile hosts.txt python eval.py \
             --vae-save-ckpt ./ckpt/vae_2018_Jul_31-23_00_45_e011.pth \
-            --rnn-save-ckpt ./ckpt/rnn_2018_Aug_01-01_23_14_e390.pth
-            --ctrl-save-ckpt ./ckpt/controller_2018-Jul-30@15:08:02_step_$i.pth
+            --rnn-save-ckpt ./ckpt/rnn_2018_Aug_01-01_23_14_e390.pth \
+            --ctrl-save-ckpt ./ckpt/controller_best_2018_Aug_01-11_38_36_step_$i.pth
     done
 elif [ $1 -eq 7 ]
 then
@@ -55,4 +55,10 @@ then
         --vae ./logs/vae_train_2018-Jul-29@18:08:14.log \
         --rnn ./logs/rnn_train_2018-Jul-29@20:37:43.log \
         --es ./logs/es_train_2018-Jul-30@15:08:02.log
+elif [ $1 -eq 8 ]
+then
+    python play.py \
+        --vae-save-ckpt ./ckpt/vae_2018_Jul_31-23_00_45_e011.pth \
+        --rnn-save-ckpt ./ckpt/rnn_2018_Aug_01-01_23_14_e390.pth \
+        --ctrl-save-ckpt ./ckpt/controller_best_2018_Aug_01-11_38_36_step_00025.pth
 fi

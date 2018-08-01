@@ -11,16 +11,12 @@ import time
 import glob
 import cma
 import os
-
 from mpi4py import MPI
 from torch.distributions import Categorical
 
 from model import RNNModel, Controller, VAE
 from common import Logger
 from config import cfg
-
-
-
 
 
 def load_init_z():
@@ -37,6 +33,14 @@ def sample_init_z(mus, logvars):
     # logvar /= 2.0
     z = mu + np.exp(logvar / 2.0) * np.random.randn(*mu.shape)
     return z
+
+def encode_action(y):
+    if y > 1 / 3.0:
+        action = torch.LongTensor([1])
+    elif y < -1 / 3.0:
+        action = torch.LongTensor([0])
+    else:
+        action = torch.LongTensor([2])
 
 def flatten_controller(controller):
     param_array = []
@@ -68,13 +72,7 @@ def rollout(model, controller, zs):
             # m = Categorical(F.softmax(y, dim=1))
             # action = m.sample()
             y = y.item()
-            if y > 1 / 3.0:
-                action = torch.LongTensor([1])
-            elif y < -1 / 3.0:
-                action = torch.LongTensor([0])
-            else:
-                action = torch.LongTensor([2])
-
+            action = encode_action(y)
             logmix, mu, logstd, done_p = model.step(z.unsqueeze(0), action.unsqueeze(0))
 
             # logmix = logmix - reduce_logsumexp(logmix)

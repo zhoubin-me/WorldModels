@@ -7,9 +7,9 @@ import cv2
 import numpy as np
 import os
 
-from collect_data import DoomTakeOver
+from collect_data import DoomTakeCover
 from model import VAE, RNNModel, Controller
-from es_train import load_init_z, sample_init_z
+from es_train import load_init_z, sample_init_z, encode_action
 from config import cfg
 from common import Logger
 
@@ -26,7 +26,7 @@ def slave(comm):
     controller = Controller()
     controller.load_state_dict(torch.load(cfg.ctrl_save_ckpt, map_location=lambda storage, loc: storage)['model'])
 
-    env = DoomTakeOver(False)
+    env = DoomTakeCover(False)
 
     rewards = []
     for epi in range(cfg.trials_per_pop * 4):
@@ -38,14 +38,8 @@ def slave(comm):
 
             inp = torch.cat((model.hx.detach(), model.cx.detach(), z), dim=1)
             y = controller(inp)
-
             y = y.item()
-            if y > 1 / 3.0:
-                action = torch.LongTensor([1])
-            elif y < -1 / 3.0:
-                action = torch.LongTensor([0])
-            else:
-                action = torch.LongTensor([2])
+            action = encode_action(y)
 
             model.step(z.unsqueeze(0), action.unsqueeze(0))
             obs_next, reward, done, _ = env.step(action.item())
