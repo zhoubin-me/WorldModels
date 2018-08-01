@@ -12,7 +12,6 @@ import glob
 import cma
 import os
 
-from joblib import Parallel, delayed
 from mpi4py import MPI
 from torch.distributions import Categorical
 
@@ -22,21 +21,13 @@ from config import cfg
 
 
 
-def load_init(f):
-    data = np.load(f)
-    return data['mu'][0], data['logvar'][0]
+
 
 def load_init_z():
-    if not os.path.exists('init_z.npz'):
-        data_list = glob.glob(cfg.seq_extract_dir + '/*.npz')
-        datas = Parallel(n_jobs=cfg.num_cpus, verbose=1)(delayed(load_init)(f) for f in data_list)
-        mus = np.array([data[0] for data in datas])
-        logvars = np.array([data[1] for data in datas])
-        np.savez_compressed('init_z.npz', mus=mus, logvars=logvars)
-    else:
-        data = np.load('init_z.npz')
-        mus = data['mus']
-        logvars = data['logvars']
+    data = np.load('init_z.npz')
+    mus = data['mus']
+    logvars = data['logvars']
+
     return mus, logvars
 
 def sample_init_z(mus, logvars):

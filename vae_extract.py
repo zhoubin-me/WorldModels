@@ -2,6 +2,7 @@ import torch
 
 from model import VAE
 from multiprocessing import Process
+from joblib import Parallel, delayed
 
 import time
 import numpy as np
@@ -54,5 +55,17 @@ def vae_extract():
     for p in procs:
         p.join()
 
+def load_init(f):
+    data = np.load(f)
+    return data['mu'][0], data['logvar'][0]
+
+def save_init_z():
+    data_list = glob.glob(cfg.seq_extract_dir + '/*.npz')
+    datas = Parallel(n_jobs=cfg.num_cpus, verbose=1)(delayed(load_init)(f) for f in data_list)
+    mus = np.array([data[0] for data in datas])
+    logvars = np.array([data[1] for data in datas])
+    np.savez_compressed('init_z.npz', mus=mus, logvars=logvars)
+
 if __name__ == '__main__':
     vae_extract()
+    save_init_z()
