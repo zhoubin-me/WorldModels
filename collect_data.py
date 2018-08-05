@@ -14,8 +14,8 @@ class DoomTakeCover:
         game = DoomGame()
         game.load_config('./scenarios/take_cover.cfg')
         if visible:
-            # game.set_screen_resolution(ScreenResolution.RES_640X480)
-            game.set_screen_resolution(ScreenResolution.RES_160X120)
+            game.set_screen_resolution(ScreenResolution.RES_640X480)
+            # game.set_screen_resolution(ScreenResolution.RES_160X120)
         else:
             game.set_screen_resolution(ScreenResolution.RES_160X120)
         game.set_screen_format(ScreenFormat.BGR24)
@@ -31,7 +31,7 @@ class DoomTakeCover:
         return img
 
     def preprocess(self, obs):
-        obs = np.array(obs[0:400, :, :]).astype(np.float)/255.0
+        obs = obs.astype(np.float32) / 255.0
         obs = np.array(resize(obs, (64, 64)))
         obs = ((1.0 - obs) * 255).round().astype(np.uint8)
         return obs
