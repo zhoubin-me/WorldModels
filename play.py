@@ -106,13 +106,49 @@ def test_rnn(epi):
         if done_p.squeeze().item() > 0:
             break
 
+    frames = [cv2.resize(frame, (256, 256)) for frame in frames]
+
     print('Episode {}: RNN Reward {}'.format(epi, step))
-    write_images(frames)
-    write_video(frames, 'rnn_{}.avi'.format(epi))
+    write_video(frames, 'rnn_{}.avi'.format(epi), (256, 256))
     os.system('mv rnn_{}.avi /home/bzhou/Dropbox/share'.format(epi))
+
+def test_real(epi):
+    vae = VAE()
+    vae.load_state_dict(torch.load(cfg.vae_save_ckpt)['model'])
+
+    model = RNNModel()
+    model.load_state_dict(torch.load(cfg.rnn_save_ckpt)['model'])
+
+    controller = Controller()
+    controller.load_state_dict(torch.load(cfg.ctrl_save_ckpt)['model'])
+
+    env = DoomTakeCover(True)
+    obs = env.reset()
+    model.reset()
+    frames = []
+    for step in range(cfg.max_steps):
+        frames.append(cv2.resize(obs, (256, 256)))
+        obs = torch.from_numpy(obs.transpose(2, 0, 1)).unsqueeze(0).float() / 255.0
+        mu, logvar, _, z = vae(obs)
+
+        inp = torch.cat((model.hx.detach(), model.cx.detach(), z), dim=1)
+        y = controller(inp)
+        y = y.item()
+        action = encode_action(y)
+
+        model.step(z.unsqueeze(0), action.unsqueeze(0))
+        obs_next, reward, done, _ = env.step(action.item())
+        obs = obs_next
+        if done:
+            break
+    print('Episode {}: Real Reward {}'.format(epi, step))
+    write_video(frames, 'real_{}.avi'.format(epi), (256, 256))
+    os.system('mv real_{}.avi /home/bzhou/Dropbox/share'.format(epi))
 
 if __name__ == '__main__':
     for epi in range(10):
-        test_rnn(epi)
+        # test_rnn(epi)
+        test_real(epi)
     # test_vae()
     # test_frames()
+    # test_real()

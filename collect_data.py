@@ -12,7 +12,7 @@ import pdb
 class DoomTakeCover:
     def __init__(self, visible=False):
         game = DoomGame()
-        game.load_config('./scenarios/take_cover.cfg')
+        game.load_config('./scenarios/my_way_home.cfg')
         if visible:
             game.set_screen_resolution(ScreenResolution.RES_640X480)
             # game.set_screen_resolution(ScreenResolution.RES_160X120)
@@ -43,7 +43,7 @@ class DoomTakeCover:
         return img
 
     def step(self, action):
-        action = self.actions[action]
+        # action = self.actions[action]
         reward = self.game.make_action(action)
         done = self.game.is_episode_finished()
         if not done:
@@ -58,6 +58,39 @@ class DreamDoomTakeCoverEnv:
         self.vae = vae
         self.rnn = rnn
 
+def play_with_kb():
+    import keyboard
+    env = DoomTakeCover(visible=True)
+
+    for step in range(cfg.max_seq_len):
+        while True:
+            if keyboard.is_pressed('q'):
+                action = [1, 0, 0, 0, 0]
+                break
+            elif keyboard.is_pressed('e'):
+                action = [0, 1, 0, 0, 0]
+                break
+            elif keyboard.is_pressed('w'):
+                action = [0, 0, 1, 0, 0]
+                break
+            elif keyboard.is_pressed('a'):
+                action = [0, 0, 0, 1, 0]
+                break
+            elif keyboard.is_pressed('d'):
+                action = [0, 0, 0, 0, 1]
+                break
+            else:
+                continue
+
+        obs, reward, done, _ = env.step(action)
+
+        if done:
+            break
+
+    print(step)
+
+
+
 
 def collect_once(size, rank):
     env = DoomTakeCover()
@@ -69,13 +102,6 @@ def collect_once(size, rank):
         for step in range(cfg.max_seq_len):
             if step % repeat == 0:
                 action = np.random.randint(0, 3)
-                '''
-                action = [0] * 43
-                if action_ == 1:
-                    action[10] = 1
-                elif action_ == 2:
-                    action[11] = 1
-                '''
             obs_next, reward, done, _ = env.step(action)
             # obs = preprocess(obs)
             traj += [(obs, action, reward, done)]
@@ -99,4 +125,4 @@ def collect_all():
     collect_once(size, rank)
 
 if __name__ == '__main__':
-    collect_all()
+    play_with_kb()

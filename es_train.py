@@ -41,6 +41,7 @@ def encode_action(y):
         action = torch.LongTensor([0])
     else:
         action = torch.LongTensor([2])
+    return action
 
 def flatten_controller(controller):
     param_array = []
